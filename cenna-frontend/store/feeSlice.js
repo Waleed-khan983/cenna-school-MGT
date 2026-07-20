@@ -103,12 +103,66 @@ export const fetchDefaulters = createAsyncThunk(
     }
 );
 
+// No dedicated "reports" endpoint exists on the backend — these three
+// figures are derived client-side from the real /fees and /fees/defaulters
+// data (both already accountant-accessible). A large limit is passed to
+// /fees so the collection total isn't silently truncated by the default
+// page size.
+export const fetchFeeReports = createAsyncThunk(
+    "fees/fetchFeeReports",
+    async (_, thunkAPI) => {
+        try {
+            const [feesRes, defaultersRes] = await Promise.all([
+                getFeesApi({ limit: 5000 }),
+                getDefaultersApi(),
+            ]);
+
+            const fees = feesRes.fees || [];
+            const defaulters = defaultersRes.defaulters || [];
+
+            const now = new Date();
+            const monthlyCollected = fees.reduce((sum, fee) => {
+                if (!fee.paidDate) return sum;
+                const paidDate = new Date(fee.paidDate);
+                if (
+                    paidDate.getMonth() === now.getMonth() &&
+                    paidDate.getFullYear() === now.getFullYear()
+                ) {
+                    return sum + Number(fee.paidAmount || 0);
+                }
+                return sum;
+            }, 0);
+
+            const pendingDues = defaulters.reduce(
+                (sum, fee) =>
+                    sum + Math.max(0, Number(fee.totalAmount || 0) - Number(fee.paidAmount || 0)),
+                0
+            );
+
+            const defaulterStudentIds = new Set(
+                defaulters.map((fee) => fee.student?._id || fee.student)
+            );
+
+            return {
+                monthlyCollected,
+                pendingDues,
+                defaulterCount: defaulterStudentIds.size,
+            };
+        } catch (error) {
+            return thunkAPI.rejectWithValue(
+                error.response?.data?.message || "Failed to load reports"
+            );
+        }
+    }
+);
+
 const feeSlice = createSlice({
     name: "fees",
 
     initialState: {
         fees: [],
         defaulters: [],
+        reports: null,
         loading: false,
         error: null,
     },
@@ -175,6 +229,19 @@ const feeSlice = createSlice({
                 state.fees = action.payload.fees || [];
             })
             .addCase(fetchStudentFees.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+
+            .addCase(fetchFeeReports.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(fetchFeeReports.fulfilled, (state, action) => {
+                state.loading = false;
+                state.reports = action.payload;
+            })
+            .addCase(fetchFeeReports.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })

@@ -1,5 +1,5 @@
 import express from "express";
-import uploadParent from "../middleware/uploadParent.js";
+import { uploadImage } from "../config/cloudinary.js";
 
 import {
   getMyParentProfile,
@@ -12,6 +12,7 @@ import {
   getMyChildrenResults,
   getMyChildrenAssignments,
   getMyChildrenFees,
+  getMyChildrenRemarks,
   updateProfileImage,
 } from "../controllers/parentController.js";
 
@@ -60,6 +61,13 @@ router.get(
   getMyChildrenAssignments
 );
 
+router.get(
+  "/remarks",
+  protect,
+  authorize("parent"),
+  getMyChildrenRemarks
+);
+
 
 
 
@@ -68,7 +76,7 @@ router.put(
   "/profile-image",
   protect,
   authorize("parent"),
-  uploadParent.single("image"),
+  uploadImage.single("image"),
   updateProfileImage
 );
 

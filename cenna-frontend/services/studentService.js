@@ -33,3 +33,13 @@ export const searchStudentsForFeesApi = async (query) => {
 
   return res.data;
 };
+
+export const promoteStudentApi = async ({ id, data }) => {
+  const response = await api.put(`/students/${id}/promote`, data);
+  return response.data;
+};
+
+export const promoteStudentsBulkApi = async (data) => {
+  const response = await api.put("/students/promote/bulk", data);
+  return response.data;
+};

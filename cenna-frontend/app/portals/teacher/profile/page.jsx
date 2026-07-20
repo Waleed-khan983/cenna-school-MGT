@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
 import { fetchMyTeacherAssignments } from "@/store/teacherAssignmentSlice";
-import { updateMyProfile } from "@/store/profileSlice";
+import { updateProfile } from "@/store/profileSlice";
 import PageLoader from "@/components/ui/PageLoader";
 
 const FILE_URL =
@@ -56,7 +56,7 @@ export default function TeacherProfilePage() {
       const formData = new FormData();
       formData.append("avatar", file);
 
-      await dispatch(updateMyProfile(formData)).unwrap();
+      await dispatch(updateProfile(formData)).unwrap();
       await dispatch(fetchMyTeacherAssignments()).unwrap();
 
       toast.success("Profile photo updated successfully");

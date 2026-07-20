@@ -1,8 +1,10 @@
 import asyncHandler from "express-async-handler";
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import Teacher from "../models/teacher.js";
 import ClassSubject from "../models/ClassSubject.js";
-import { getPagination } from "../utils/helpers.js";
+import { getPagination, generateTempPassword } from "../utils/helpers.js";
+import { getNextSequence } from "../utils/sequence.js";
 
 const populateTeacherUser = {
   path: "user",
@@ -26,6 +28,18 @@ const attachAssignments = async (teacherDoc) => {
   teacher.assignments = await getTeacherAssignments(teacher._id);
 
   return teacher;
+};
+
+// GET /teachers and GET /teachers/:id are open to the "teacher" role
+// (colleague directory, e.g. so a class teacher can be shown), but that
+// should never mean any teacher can read another's salary/CNIC/home
+// address — payroll and personal-ID data. /teachers/me already covers
+// self-service, so redact these fields for anyone who isn't admin/staff.
+const redactSensitiveTeacherFields = (teacher, viewerRole) => {
+  if (viewerRole === "admin" || !teacher) return teacher;
+
+  const { salary, cnic, address, ...rest } = teacher;
+  return rest;
 };
 
 export const createTeacher = asyncHandler(async (req, res) => {
@@ -53,25 +67,72 @@ export const createTeacher = asyncHandler(async (req, res) => {
     throw new Error("Email already exists");
   }
 
-  const user = await User.create({
-    name,
-    email,
-    password: password || `cenna@${new Date().getFullYear()}`,
-    role: "teacher",
-    phone,
-  });
+  const isTempPassword = !password;
+  const finalPassword = password || generateTempPassword();
 
-  const teacher = await Teacher.create({
-    user: user._id,
-    qualification,
-    designation,
-    cnic,
-    address,
-    salary,
-    isActive: true,
-  });
+  // User + Teacher must both exist or neither does — a failure partway
+  // through used to leave an orphaned User with no Teacher profile (see
+  // Tier 4 report). Both writes now share one transaction.
+  const session = await mongoose.startSession();
+  let createdTeacherId;
 
-  const populated = await Teacher.findById(teacher._id).populate(
+  try {
+    await session.withTransaction(async () => {
+      const employeeSeq = await getNextSequence("teacherEmployeeId", session);
+      const employeeId = `TCH-${String(employeeSeq).padStart(3, "0")}`;
+
+      const [user] = await User.create(
+        [
+          {
+            name,
+            email,
+            password: finalPassword,
+            role: "teacher",
+            phone,
+            mustChangePassword: isTempPassword,
+          },
+        ],
+        { session },
+      );
+
+      const [teacher] = await Teacher.create(
+        [
+          {
+            user: user._id,
+            employeeId,
+            qualification,
+            designation,
+            cnic,
+            address,
+            salary,
+            isActive: true,
+          },
+        ],
+        { session },
+      );
+
+      createdTeacherId = teacher._id;
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      const field = Object.keys(error.keyValue || {})[0] || "field";
+      const label =
+        field === "email"
+          ? "Email"
+          : field === "employeeId"
+            ? "Employee ID"
+            : field;
+
+      res.status(400);
+      throw new Error(`${label} already exists`);
+    }
+
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
+  const populated = await Teacher.findById(createdTeacherId).populate(
     populateTeacherUser
   );
 
@@ -81,6 +142,11 @@ export const createTeacher = asyncHandler(async (req, res) => {
     success: true,
     message: "Teacher created",
     teacher: teacherWithAssignments,
+    // Only returned once, after the transaction has committed, and only
+    // when no password was supplied — it is never stored in plaintext and
+    // can't be retrieved again. Never sent for a rolled-back attempt, since
+    // we only reach this point if the transaction above succeeded.
+    ...(isTempPassword && { temporaryPassword: finalPassword }),
   });
 });
 
@@ -114,12 +180,16 @@ export const getTeachers = asyncHandler(async (req, res) => {
     teachers.map((teacher) => attachAssignments(teacher))
   );
 
+  const responseTeachers = teachersWithAssignments.map((teacher) =>
+    redactSensitiveTeacherFields(teacher, req.user.role)
+  );
+
   res.status(200).json({
     success: true,
-    count: teachersWithAssignments.length,
+    count: responseTeachers.length,
     total,
     page,
-    teachers: teachersWithAssignments,
+    teachers: responseTeachers,
   });
 });
 
@@ -137,7 +207,7 @@ export const getTeacher = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    teacher: teacherWithAssignments,
+    teacher: redactSensitiveTeacherFields(teacherWithAssignments, req.user.role),
   });
 });
 

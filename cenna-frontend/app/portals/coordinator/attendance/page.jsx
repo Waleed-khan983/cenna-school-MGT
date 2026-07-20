@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 import { fetchCoordinatorAttendance } from "@/store/coordinatorSlice";
@@ -10,11 +10,21 @@ import PageLoader from "@/components/ui/PageLoader";
 export default function CoordinatorAttendancePage() {
   const dispatch = useDispatch();
 
+  const [search, setSearch] = useState("");
+
   const {
     attendanceSummary,
     attendanceClasses,
     loading,
   } = useSelector((state) => state.coordinator);
+
+  const filteredClasses = useMemo(() => {
+    const keyword = search.toLowerCase();
+
+    return attendanceClasses.filter((item) =>
+      item.className?.toLowerCase().includes(keyword)
+    );
+  }, [attendanceClasses, search]);
 
   console.log("Attendance Summary:", attendanceSummary);
   console.log("Attendance Classes:", attendanceClasses);
@@ -38,6 +48,16 @@ export default function CoordinatorAttendancePage() {
         <p className="mt-2 text-gray-500">
           Monitor today's attendance across all classes.
         </p>
+
+        <div className="mb-8 mt-6">
+          <input
+            type="text"
+            placeholder="Search class..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-black"
+          />
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -115,7 +135,7 @@ export default function CoordinatorAttendancePage() {
 
           <tbody>
 
-            {attendanceClasses.map((item) => (
+            {filteredClasses.map((item) => (
 
               <tr
                 key={item._id}
@@ -159,6 +179,12 @@ export default function CoordinatorAttendancePage() {
         </table>
 
       </div>
+
+      {!loading && filteredClasses.length === 0 && (
+        <div className="rounded-2xl bg-white p-10 text-center text-gray-500">
+          No attendance records found.
+        </div>
+      )}
 
     </section>
   );

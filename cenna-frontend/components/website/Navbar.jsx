@@ -8,15 +8,7 @@ import {
   FaBars,
   FaTimes,
   FaDownload,
-  FaHome,
-  FaInfoCircle,
-  FaGraduationCap,
-  FaClipboardList,
-  FaBriefcase,
-  FaNewspaper,
-  FaImages,
-  FaEnvelope,
-  FaUserGraduate,
+ 
 } from "react-icons/fa";
 
 import useSchoolSettings from "@/hooks/useSchoolSettings";
@@ -29,65 +21,58 @@ export default function Navbar() {
     {
       name: "Home",
       href: "/",
-      icon: <FaHome />,
+
       show: true,
     },
     {
       name: "About",
       href: "/about",
-      icon: <FaInfoCircle />,
+
       show: true,
     },
     {
       name: "Academics",
       href: "/academics",
-      icon: <FaGraduationCap />,
+
       show: true,
     },
     {
       name: "Admission Form",
       href: "/admission-form",
-      icon: <FaClipboardList />,
+
       show: true,
     },
     {
       name: "Jobs",
       href: "/job-application",
-      icon: <FaBriefcase />,
+
       show: true,
     },
     {
       name: "News & Events",
       href: "/news",
-      icon: <FaNewspaper />,
+
       show: settings.enableNews !== false,
     },
     {
       name: "Gallery",
       href: "/gallery",
-      icon: <FaImages />,
+
       show: settings.enableGallery !== false,
     },
     {
       name: "Contact",
       href: "/contact",
-      icon: <FaEnvelope />,
+
       show: true,
     },
     {
       name: "Alumni Registration",
       href: "/alumini-registration",
-      icon: <FaUserGraduate />,
+
       show: true,
     },
-    // Example download button
-    // {
-    //   name: "Prospectus",
-    //   href: "/files/prospectus.pdf",
-    //   icon: <FaDownload />,
-    //   download: true,
-    //   show: true,
-    // },
+
   ];
 
   const visibleLinks = navLinks.filter((link) => link.show);

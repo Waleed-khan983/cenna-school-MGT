@@ -1,28 +1,41 @@
 import asyncHandler from "express-async-handler";
+import mongoose from "mongoose";
 
 import User from "../models/User.js";
 import Student from "../models/Student.js";
 import Parent from "../models/parent.js";
 import Class from "../models/class.js";
 
-import { getPagination } from "../utils/helpers.js";
+import { getPagination, generateTempPassword } from "../utils/helpers.js";
+import { extractCloudinaryPublicId, destroyUploadedAsset } from "../utils/documentAccess.js";
+import { assertTeacherAssignedToClass } from "../utils/ownership.js";
 
 // @desc    Get all students
 // @route   GET /api/students
 // @access  Admin, Teacher
+// @desc    Get all students
+// @route   GET /api/students
+// @access  Admin, Accountant, Operator
 export const getStudents = asyncHandler(async (req, res) => {
-  const { page, limit, skip } = getPagination(req.query);
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.max(Number(req.query.limit) || 20, 1);
+  const skip = (page - 1) * limit;
 
   const filter = {};
 
-  if (req.query.class) filter.class = req.query.class;
-  if (req.query.section) filter.section = req.query.section;
+  if (req.query.class) {
+    filter.class = req.query.class;
+  }
+
+  if (req.query.section) {
+    filter.section = req.query.section;
+  }
 
   if (req.query.isActive !== undefined) {
     filter.isActive = req.query.isActive === "true";
   }
 
-  if (req.query.search) {
+  if (req.query.search && req.query.search.trim()) {
     const search = req.query.search.trim();
 
     const users = await User.find({
@@ -47,6 +60,12 @@ export const getStudents = asyncHandler(async (req, res) => {
       },
       {
         rollNumber: {
+          $regex: search,
+          $options: "i",
+        },
+      },
+      {
+        fatherName: {
           $regex: search,
           $options: "i",
         },
@@ -104,6 +123,10 @@ export const getStudent = asyncHandler(async (req, res) => {
     }
   }
 
+  if (req.user.role === "teacher") {
+    await assertTeacherAssignedToClass(req.user._id, student.class?._id || student.class);
+  }
+
   res.status(200).json({
     success: true,
     student,
@@ -139,7 +162,9 @@ export const createStudent = asyncHandler(async (req, res) => {
 
   if (!name || !admissionNo || !fatherName || !classId) {
     res.status(400);
-    throw new Error("Name, admission number, father name, and class are required");
+    throw new Error(
+      "Name, admission number, father name, and class are required",
+    );
   }
 
   const selectedClass = await Class.findById(classId);
@@ -158,9 +183,7 @@ export const createStudent = asyncHandler(async (req, res) => {
 
   const generatedEmail =
     email ||
-    `${admissionNo}${name
-      .toLowerCase()
-      .replace(/\s+/g, "")}@gmail.com`;
+    `${admissionNo}${name.toLowerCase().replace(/\s+/g, "")}@gmail.com`;
   const existingUser = await User.findOne({ email: generatedEmail });
 
   if (existingUser) {
@@ -168,60 +191,115 @@ export const createStudent = asyncHandler(async (req, res) => {
     throw new Error("Student user already exists");
   }
 
-  let user = null;
+  if (parentId) {
+    const parentExists = await Parent.findById(parentId);
+
+    if (!parentExists) {
+      res.status(404);
+      throw new Error("Selected parent not found");
+    }
+  }
+
+  const isTempPassword = !password;
+  const finalPassword = password || generateTempPassword();
+
+  // User + Student (+ the Parent link, if any) must all succeed together.
+  // The old manual "delete the User in catch" rollback only covered a
+  // failure AFTER the User was created — a failure after the Student was
+  // created (e.g. the Parent update) left an orphaned Student with a
+  // dangling user reference. One transaction covers every stage.
+  const session = await mongoose.startSession();
+  let createdStudentId;
 
   try {
-    user = await User.create({
-      name,
-      email: generatedEmail,
-      password: password || `cenna@${new Date().getFullYear()}`,
-      role: "student",
-      phone,
-    });
+    await session.withTransaction(async () => {
+      const [user] = await User.create(
+        [
+          {
+            name,
+            email: generatedEmail,
+            password: finalPassword,
+            role: "student",
+            phone,
+            mustChangePassword: isTempPassword,
+          },
+        ],
+        { session },
+      );
 
-    const student = await Student.create({
-      user: user._id,
-      admissionNo,
-      rollNumber,
-      class: classId,
-      section: section || selectedClass.section || "A",
-      fatherName,
-      motherName,
-      dob,
-      gender,
-      religion,
-      nationality,
-      bForm,
-      address,
-      parent: parentId || undefined,
-      prevSchool,
-      prevMarks,
-    });
+      const [student] = await Student.create(
+        [
+          {
+            user: user._id,
+            admissionNo,
+            rollNumber,
+            class: classId,
+            section: section || selectedClass.section || "A",
+            fatherName,
+            motherName,
+            dob,
+            gender,
+            religion,
+            nationality,
+            bForm,
+            address,
+            parent: parentId || undefined,
+            prevSchool,
+            prevMarks,
+          },
+        ],
+        { session },
+      );
 
- 
-    if (parentId) {
-      await Parent.findByIdAndUpdate(parentId, {
-        $addToSet: { children: student._id },
-      });
-    }
+      if (parentId) {
+        const updatedParent = await Parent.findByIdAndUpdate(
+          parentId,
+          { $addToSet: { children: student._id } },
+          { session, new: true },
+        );
 
-    const populated = await Student.findById(student._id)
-      .populate("user", "name email phone avatar isActive")
-      .populate("class", "name section displayName room")
-      .populate("parent");
+        if (!updatedParent) {
+          const err = new Error("Selected parent not found");
+          err.statusCode = 404;
+          throw err;
+        }
+      }
 
-    res.status(201).json({
-      success: true,
-      message: "Student created successfully",
-      student: populated,
+      createdStudentId = student._id;
     });
   } catch (error) {
-    if (user) {
-      await User.findByIdAndDelete(user._id);
+    if (error?.code === 11000) {
+      const field = Object.keys(error.keyValue || {})[0] || "field";
+      const label =
+        field === "email"
+          ? "Email"
+          : field === "admissionNo"
+            ? "Admission number"
+            : field;
+
+      res.status(400);
+      throw new Error(`${label} already exists`);
     }
 
     throw error;
+  } finally {
+    await session.endSession();
   }
+
+  const populated = await Student.findById(createdStudentId)
+    .populate("user", "name email phone avatar isActive")
+    .populate("class", "name section displayName room")
+    .populate("parent");
+
+  res.status(201).json({
+    success: true,
+    message: "Student created successfully",
+    student: populated,
+    // Only returned once, after the transaction has committed, and only
+    // when no password was supplied — it is never stored in plaintext and
+    // can't be retrieved again.
+    ...(isTempPassword && { temporaryPassword: finalPassword }),
+  });
 });
 
 // @desc    Update student
@@ -326,7 +404,7 @@ export const updateStudent = asyncHandler(async (req, res) => {
     {
       new: true,
       runValidators: true,
-    }
+    },
   )
     .populate("user", "name email phone avatar isActive")
     .populate("class", "name section displayName room")
@@ -345,7 +423,6 @@ export const updateStudent = asyncHandler(async (req, res) => {
   });
 });
 
-
 // @desc    Update my profile image
 // @route   PUT /api/students/me/avatar
 // @access  Student
@@ -362,14 +439,27 @@ export const updateMyAvatar = asyncHandler(async (req, res) => {
     throw new Error("Please upload an image");
   }
 
-
+  // multer-storage-cloudinary already uploaded the new image (see
+  // routes/student.Routes.js — uploadImage) by the time this handler runs;
+  // .path is the secure_url, same convention gallery/news use.
   const avatarPath = req.file.path;
+
+  const previousUser = await User.findById(req.user.id).select("avatar");
 
   const user = await User.findByIdAndUpdate(
     req.user.id,
     { avatar: avatarPath },
-    { new: true }
+    { new: true },
   );
+
+  // Only delete the old avatar once the new one is confirmed saved — never
+  // the other way around. Silently skipped for a legacy "/uploads/..."
+  // path, which was never a Cloudinary asset to begin with.
+  const previousPublicId = extractCloudinaryPublicId(previousUser?.avatar);
+
+  if (previousPublicId) {
+    await destroyUploadedAsset(previousPublicId, "image");
+  }
 
   const updatedStudent = await Student.findOne({ user: req.user.id })
     .populate("user", "name email phone avatar")
@@ -432,11 +522,27 @@ export const getMyProfile = asyncHandler(async (req, res) => {
 // @route   GET /api/students/class/:classId
 // @access  Admin, Teacher
 export const getStudentsByClass = asyncHandler(async (req, res) => {
+  // Admin/operator get their intended school-wide access unchanged. A
+  // teacher must actually be assigned to this class via ClassSubject —
+  // authorize("teacher") only confirms their role, not which class(es)
+  // they teach, so the classId from the URL can't be trusted on its own.
+  if (req.user.role === "teacher") {
+    await assertTeacherAssignedToClass(req.user._id, req.params.classId);
+  } else {
+    const klass = await Class.findById(req.params.classId);
+
+    if (!klass) {
+      res.status(404);
+      throw new Error("Class not found");
+    }
+  }
+
   const students = await Student.find({
     class: req.params.classId,
     isActive: true,
   })
     .populate("user", "name email phone avatar")
+    .populate("class", "displayName name section")
     .sort({ rollNumber: 1 });
 
   res.status(200).json({
@@ -445,7 +551,6 @@ export const getStudentsByClass = asyncHandler(async (req, res) => {
     students,
   });
 });
-
 
 export const searchStudentsForFees = asyncHandler(async (req, res) => {
   const query = req.query.query?.trim();
@@ -489,12 +594,242 @@ export const searchStudentsForFees = asyncHandler(async (req, res) => {
     .filter(
       (student, index, self) =>
         index ===
-        self.findIndex((item) => String(item._id) === String(student._id))
+        self.findIndex((item) => String(item._id) === String(student._id)),
     )
     .slice(0, 10);
 
   res.status(200).json({
     success: true,
     students: merged,
+  });
+});
+
+// @desc    Promote one student
+// @route   PUT /api/students/:id/promote
+// @access  Admin
+export const promoteStudent = asyncHandler(async (req, res) => {
+  const { toClassId, toSection, academicYear, remarks } = req.body;
+
+  if (!toClassId || !academicYear) {
+    res.status(400);
+    throw new Error("New class and academic year are required");
+  }
+
+  const student = await Student.findById(req.params.id);
+
+  if (!student) {
+    res.status(404);
+    throw new Error("Student not found");
+  }
+
+  if (!student.isActive) {
+    res.status(400);
+    throw new Error("Inactive students cannot be promoted");
+  }
+
+  const toClass = await Class.findById(toClassId);
+
+  if (!toClass) {
+    res.status(404);
+    throw new Error("Target class not found");
+  }
+
+  if (String(student.class) === String(toClassId)) {
+    res.status(400);
+    throw new Error("Student is already in this class");
+  }
+
+  const alreadyPromotedForYear = student.promotionHistory?.some(
+    (item) => item.academicYear === academicYear,
+  );
+
+  if (alreadyPromotedForYear) {
+    res.status(400);
+    throw new Error(`Student has already been promoted for ${academicYear}`);
+  }
+
+  const fromClass = student.class;
+  const fromSection = student.section;
+
+  student.promotionHistory.push({
+    fromClass,
+    toClass: toClassId,
+    fromSection,
+    toSection: toSection || toClass.section || "A",
+    academicYear,
+    promotedBy: req.user._id,
+    remarks,
+  });
+
+  student.class = toClassId;
+  student.section = toSection || toClass.section || "A";
+  student.academicYear = academicYear;
+  student.promotionStatus = "promoted";
+
+  await student.save();
+
+  const updatedStudent = await Student.findById(student._id)
+    .populate("user", "name email phone avatar isActive")
+    .populate("class", "name section displayName room")
+    .populate("parent")
+    .populate("promotionHistory.fromClass", "name section displayName")
+    .populate("promotionHistory.toClass", "name section displayName")
+    .populate("promotionHistory.promotedBy", "name role");
+
+  res.status(200).json({
+    success: true,
+    message: "Student promoted successfully",
+    student: updatedStudent,
+  });
+});
+
+// @desc    Promote full class
+// @route   PUT /api/students/promote/bulk
+// @access  Admin
+export const promoteStudentsBulk = asyncHandler(async (req, res) => {
+  const {
+    fromClassId,
+    toClassId,
+    fromSection,
+    toSection,
+    academicYear,
+    studentIds,
+    remarks,
+  } = req.body;
+
+  if (!fromClassId || !toClassId || !academicYear) {
+    res.status(400);
+    throw new Error("From class, to class, and academic year are required");
+  }
+
+  if (String(fromClassId) === String(toClassId)) {
+    res.status(400);
+    throw new Error("From class and to class cannot be the same");
+  }
+
+  // studentIds omitted entirely means "promote the whole class/section" —
+  // but an explicitly empty array means the caller selected nothing, which
+  // must be rejected rather than silently falling back to the whole-class
+  // behavior (an earlier `studentIds?.length ? ... : undefined` check
+  // treated both cases identically, since `[].length` is falsy too, and
+  // testing this batch caught it live-promoting an entire class).
+  if (studentIds !== undefined && studentIds.length === 0) {
+    res.status(400);
+    throw new Error("No students selected for promotion");
+  }
+
+  // De-duplicate caller-supplied IDs up front so the same student can never
+  // be processed twice in one batch (which would otherwise push two
+  // promotionHistory entries for a single promotion).
+  const uniqueStudentIds = studentIds?.length
+    ? [...new Set(studentIds.map(String))]
+    : undefined;
+
+  // Every read that decides the batch and every write that applies it runs
+  // inside one transaction: a genuine failure partway through (a bad
+  // studentId, a validation error, a dropped connection) rolls back
+  // everything already written in this attempt, instead of leaving some
+  // students promoted and others not. Students skipped for a legitimate
+  // business reason (already promoted this year) are NOT a failure — they
+  // coexist with a successful commit of everyone else, same as before.
+  const session = await mongoose.startSession();
+
+  let promoted = [];
+  let skipped = [];
+  let totalFound = 0;
+
+  try {
+    await session.withTransaction(async () => {
+      const fromClass = await Class.findById(fromClassId).session(session);
+      const toClass = await Class.findById(toClassId).session(session);
+
+      if (!fromClass || !toClass) {
+        const err = new Error("From class or target class not found");
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const filter = {
+        class: fromClassId,
+        isActive: true,
+      };
+
+      if (fromSection) {
+        filter.section = fromSection;
+      }
+
+      if (uniqueStudentIds) {
+        filter._id = { $in: uniqueStudentIds };
+      }
+
+      const students = await Student.find(filter).session(session);
+
+      totalFound = students.length;
+
+      if (!students.length) {
+        const err = new Error("No active students found for promotion");
+        err.statusCode = 404;
+        throw err;
+      }
+
+      // withTransaction may retry this callback on a transient MongoDB
+      // error — reset per attempt so a retry can't accumulate duplicate
+      // entries from a previous (aborted) attempt.
+      promoted = [];
+      skipped = [];
+
+      for (const student of students) {
+        const alreadyPromotedForYear = student.promotionHistory?.some(
+          (item) => item.academicYear === academicYear,
+        );
+
+        if (alreadyPromotedForYear) {
+          skipped.push({
+            studentId: student._id,
+            admissionNo: student.admissionNo,
+            reason: `Already promoted for ${academicYear}`,
+          });
+
+          continue;
+        }
+
+        student.promotionHistory.push({
+          fromClass: student.class,
+          toClass: toClassId,
+          fromSection: student.section,
+          toSection: toSection || toClass.section || "A",
+          academicYear,
+          promotedBy: req.user._id,
+          remarks,
+        });
+
+        student.class = toClassId;
+        student.section = toSection || toClass.section || "A";
+        student.academicYear = academicYear;
+        student.promotionStatus = "promoted";
+
+        await student.save({ session });
+
+        promoted.push({
+          studentId: student._id,
+          admissionNo: student.admissionNo,
+        });
+      }
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  // Only reachable if the transaction above committed — a thrown error
+  // propagates to asyncHandler instead, so a rolled-back attempt can never
+  // report success.
+  res.status(200).json({
+    success: true,
+    message: "Bulk promotion completed",
+    totalFound,
+    promotedCount: promoted.length,
+    skippedCount: skipped.length,
+    promoted,
+    skipped,
   });
 });

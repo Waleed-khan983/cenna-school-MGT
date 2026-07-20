@@ -1,5 +1,56 @@
 import mongoose from "mongoose";
 
+const PromotionHistorySchema = new mongoose.Schema(
+  {
+    fromClass: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+      required: true,
+    },
+
+    toClass: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+      required: true,
+    },
+
+    fromSection: {
+      type: String,
+      trim: true,
+    },
+
+    toSection: {
+      type: String,
+      trim: true,
+      default: "A",
+    },
+
+    academicYear: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    promotedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    promotedAt: {
+      type: Date,
+      default: Date.now,
+    },
+
+    remarks: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  { _id: true }
+);
+
 const StudentSchema = new mongoose.Schema(
   {
     user: {
@@ -9,7 +60,6 @@ const StudentSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Optional
     rollNumber: {
       type: String,
       trim: true,
@@ -17,7 +67,6 @@ const StudentSchema = new mongoose.Schema(
       default: undefined,
     },
 
-    // Login ID
     admissionNo: {
       type: String,
       required: true,
@@ -90,6 +139,29 @@ const StudentSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    // ==========================
+    // Promotion Fields
+    // ==========================
+
+    academicYear: {
+      type: String,
+      trim: true,
+      default: "2026-2027",
+      index: true,
+    },
+
+    promotionStatus: {
+      type: String,
+      enum: ["studying", "promoted", "graduated", "left"],
+      default: "studying",
+      index: true,
+    },
+
+    promotionHistory: {
+      type: [PromotionHistorySchema],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -97,7 +169,6 @@ const StudentSchema = new mongoose.Schema(
 );
 
 const Student =
-  mongoose.models.Student ||
-  mongoose.model("Student", StudentSchema);
+  mongoose.models.Student || mongoose.model("Student", StudentSchema);
 
 export default Student;

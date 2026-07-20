@@ -385,6 +385,7 @@ export const login = asyncHandler(async (req, res) => {
       phone: user.phone,
       avatar: user.avatar,
       lastLogin: user.lastLogin,
+      mustChangePassword: user.mustChangePassword,
     },
     profile,
   });
@@ -449,17 +450,35 @@ export const changePassword = asyncHandler(async (req, res) => {
   }
 
   user.password = newPassword;
+  user.mustChangePassword = false;
   await user.save();
 
   sendTokenResponse(user, 200, res, "Password changed successfully");
 });
 
 export const forgotPassword = asyncHandler(async (req, res) => {
-  const user = await User.findOne({ email: req.body.email });
+  const { email } = req.body;
 
-  if (!user) {
-    res.status(404);
-    throw new Error("No user with that email");
+  if (!email) {
+    res.status(400);
+    throw new Error("Email is required");
+  }
+
+  // Always the same status, message and shape whether or not this email
+  // has an account — otherwise the endpoint becomes an account-enumeration
+  // oracle (try a list of emails, see which ones say "found").
+  const genericResponse = {
+    success: true,
+    message:
+      "If an account with that email exists, a password reset link has been sent.",
+  };
+
+  const user = await User.findOne({ email });
+
+  // Deactivated accounts are treated exactly like non-existent ones here —
+  // confirming "this email exists but is deactivated" is its own leak.
+  if (!user || !user.isActive) {
+    return res.status(200).json(genericResponse);
   }
 
   const resetToken = crypto.randomBytes(20).toString("hex");
@@ -475,16 +494,21 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
   const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
-  await sendEmail({
+  const sent = await sendEmail({
     to: user.email,
     subject: "Password Reset — CENNA School",
     html: `<p>You requested a password reset. Click <a href="${resetUrl}">here</a> to reset your password. Link expires in 10 minutes.</p>`,
   });
 
-  res.status(200).json({
-    success: true,
-    message: "Password reset email sent",
-  });
+  if (!sent) {
+    // Operational failure only, logged server-side — never surfaced to the
+    // client, which would otherwise confirm this email has an account.
+    console.error(
+      `[forgotPassword] Failed to send reset email for user ${user._id}`,
+    );
+  }
+
+  res.status(200).json(genericResponse);
 });
 
 export const resetPassword = asyncHandler(async (req, res) => {
@@ -506,6 +530,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
   user.password = req.body.password;
   user.resetPasswordToken = undefined;
   user.resetPasswordExpire = undefined;
+  user.mustChangePassword = false;
 
   await user.save();
 

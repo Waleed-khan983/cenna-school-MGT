@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 import { fetchStudentPerformance } from "@/store/coordinatorSlice";
@@ -10,6 +10,8 @@ import PageLoader from "@/components/ui/PageLoader";
 export default function CoordinatorPerformancePage() {
   const dispatch = useDispatch();
 
+  const [search, setSearch] = useState("");
+
   const {
     loading,
     performanceSummary,
@@ -17,6 +19,18 @@ export default function CoordinatorPerformancePage() {
   } = useSelector(
     (state) => state.coordinator
   );
+
+  const filteredStudents = useMemo(() => {
+    const keyword = search.toLowerCase();
+
+    return performanceStudents.filter((student) => {
+      return (
+        student.name?.toLowerCase().includes(keyword) ||
+        student.admissionNo?.toLowerCase().includes(keyword) ||
+        student.className?.toLowerCase().includes(keyword)
+      );
+    });
+  }, [performanceStudents, search]);
 
   useEffect(() => {
     dispatch(fetchStudentPerformance());
@@ -40,6 +54,16 @@ export default function CoordinatorPerformancePage() {
         <p className="text-gray-500 mt-2">
           Monitor academic performance across the school.
         </p>
+
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Search by student, admission no or class..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-black"
+          />
+        </div>
 
       </div>
 
@@ -111,7 +135,7 @@ export default function CoordinatorPerformancePage() {
 
       <div className="grid gap-5 lg:grid-cols-2">
 
-        {performanceStudents.map((student) => (
+        {filteredStudents.map((student) => (
 
           <div
             key={student._id}
@@ -152,15 +176,14 @@ export default function CoordinatorPerformancePage() {
                 <strong>Status:</strong>{" "}
 
                 <span
-                  className={`font-semibold ${
-                    student.status === "Excellent"
-                      ? "text-green-600"
-                      : student.status === "Good"
+                  className={`font-semibold ${student.status === "Excellent"
+                    ? "text-green-600"
+                    : student.status === "Good"
                       ? "text-blue-600"
                       : student.status === "Average"
-                      ? "text-yellow-600"
-                      : "text-red-600"
-                  }`}
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                    }`}
                 >
                   {student.status}
                 </span>
@@ -174,6 +197,12 @@ export default function CoordinatorPerformancePage() {
         ))}
 
       </div>
+
+      {!loading && filteredStudents.length === 0 && (
+        <div className="rounded-2xl bg-white p-10 text-center text-gray-500">
+          No students found.
+        </div>
+      )}
 
     </section>
   );

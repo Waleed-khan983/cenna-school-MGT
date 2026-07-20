@@ -1,11 +1,11 @@
 import asyncHandler from "express-async-handler";
 
-import Fee from "../models/Fee.js";
+import Fee from "../models/fee.js";
 import Student from "../models/Student.js";
-import Parent from "../models/Parent.js";
+import Parent from "../models/parent.js";
 import { getPagination, sendFeeAlert } from "../utils/helpers.js";
-
-const generateReceiptNo = () => `RCPT-${Date.now()}`;
+import { assertParentOwnsStudent } from "../utils/ownership.js";
+import { getNextSequence } from "../utils/sequence.js";
 
 export const generateChallan = asyncHandler(async (req, res) => {
   const {
@@ -107,7 +107,10 @@ export const collectFee = asyncHandler(async (req, res) => {
   fee.status = newPaidAmount >= fee.totalAmount ? "Paid" : "Partial";
 
   if (!fee.receiptNo) {
-    fee.receiptNo = generateReceiptNo();
+    // Date.now() alone collides under concurrent fee collection (same
+    // millisecond, two requests). An atomic counter can't collide.
+    const seq = await getNextSequence("feeReceiptNo");
+    fee.receiptNo = `RCPT-${String(seq).padStart(6, "0")}`;
   }
 
   fee.collectedBy = req.user._id;
@@ -164,6 +167,14 @@ export const getAllFees = asyncHandler(async (req, res) => {
 });
 
 export const getFeesByStudent = asyncHandler(async (req, res) => {
+  // Admin/accountant are trusted staff roles for this route (per
+  // fee.Routes.js authorize list) and can view any student. A parent must
+  // be shown to actually be linked to the requested student first — these
+  // are financial records.
+  if (req.user.role === "parent") {
+    await assertParentOwnsStudent(req.user._id, req.params.studentId);
+  }
+
   const fees = await Fee.find({
     student: req.params.studentId,
   })

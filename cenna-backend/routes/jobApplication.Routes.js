@@ -8,13 +8,13 @@ import {
 } from "../controllers/jobApplicationController.js";
 
 import { protect, adminOnly } from "../middleware/auth.js";
-import { uploadLocal } from "../config/cloudinary.js";
+import { uploadCV } from "../config/cloudinary.js";
 
 const router = express.Router();
 
 router.post(
   "/public",
-  uploadLocal.single("cv"),
+  uploadCV.single("cv"),
   submitJobApplication
 );
 

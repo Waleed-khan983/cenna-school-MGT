@@ -2,7 +2,7 @@ import express from "express";
 
 import {
   getStudentDashboard,
-} from "../controllers/studentDashboardController.js";
+} from "../controllers/studentdashboardController.js";
 
 import {
   protect,

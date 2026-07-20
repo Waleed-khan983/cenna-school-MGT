@@ -1,5 +1,5 @@
 import asyncHandler from "express-async-handler";
-import Datesheet from "../models/Datesheet.js";
+import Datesheet from "../models/datesheet.js";
 
 export const createDatesheet = asyncHandler(async (req, res) => {
   const datesheet = await Datesheet.create(req.body);

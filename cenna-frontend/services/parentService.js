@@ -35,6 +35,11 @@ export const getMyChildrenFeesApi = async (params = {}) => {
   return res.data;
 };
 
+export const getMyChildrenRemarksApi = async (params = {}) => {
+  const res = await api.get("/parents/remarks", { params });
+  return res.data;
+};
+
 export const createParent = async (data) => {
   const res = await api.post("/parents", data);
   return res.data;

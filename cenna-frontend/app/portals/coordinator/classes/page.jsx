@@ -1,25 +1,47 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
-import { fetchCoordinatorClasses } from "@/store/coordinatorSlice";
+import { fetchClassMonitoring } from "@/store/coordinatorSlice";
 
 import PageLoader from "@/components/ui/PageLoader";
 
 export default function CoordinatorClassesPage() {
   const dispatch = useDispatch();
 
+  const [search, setSearch] = useState("");
+
   const {
     classes = [],
     loading,
   } = useSelector((state) => state.coordinator);
 
+  const filteredClasses = useMemo(() => {
+    return classes.filter((item) => {
+      const keyword = search.toLowerCase();
+
+      return (
+        item.displayName?.toLowerCase().includes(keyword) ||
+        item.classTeacher?.user?.name
+          ?.toLowerCase()
+          .includes(keyword)
+      );
+    });
+  }, [classes, search]);
+
+
+
   // -------------------------------
   // Load
   // -------------------------------
   useEffect(() => {
-    dispatch(fetchCoordinatorClasses());
+    dispatch(fetchClassMonitoring())
+      .unwrap()
+      .then((data) => {
+        console.log("Coordinator API:", data);
+      })
+      .catch(console.error);
   }, [dispatch]);
 
   if (loading) {
@@ -39,8 +61,18 @@ export default function CoordinatorClassesPage() {
         Monitor every class, assigned teacher and student strength.
       </p>
 
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Search by class or teacher..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-black"
+        />
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {classes.map((item) => (
+        {filteredClasses.map((item) => (
           <div
             key={item._id}
             className="rounded-3xl border bg-white p-6 shadow-sm"
@@ -124,7 +156,7 @@ export default function CoordinatorClassesPage() {
         ))}
       </div>
 
-      {!loading && classes.length === 0 && (
+      {!loading && filteredClasses.length === 0 && (
         <div className="rounded-2xl bg-white p-10 text-center text-gray-500">
           No classes found.
         </div>

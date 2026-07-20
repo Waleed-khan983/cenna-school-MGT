@@ -1,13 +1,13 @@
 import asyncHandler from "express-async-handler";
 
-import Student from "../models/student.js";
+import Student from "../models/Student.js";
 import Attendance from "../models/attendance.js";
 import Assignment from "../models/assignment.js";
-import Quiz from "../models/quiz.js";
+import Quiz from "../models/Quiz.js";
 import Fee from "../models/fee.js";
 import Subject from "../models/subject.js";
-import Datesheet from "../models/Datesheet.js";
-import Timetable from "../models/Timetable.js";
+import Datesheet from "../models/datesheet.js";
+import Timetable from "../models/timetable.js";
 import Notification from "../models/notification.js";
 
 export const getStudentDashboard = asyncHandler(

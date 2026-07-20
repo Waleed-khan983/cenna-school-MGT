@@ -34,11 +34,9 @@ import {
   FaTimes,
   FaCalendarAlt,
   FaBriefcase,
-  FaUserFriends,
-  FaWaveSquare,
- 
+  FaExchangeAlt,
 } from "react-icons/fa";
- 
+
 const sidebarData = {
   admin: {
     title: "Admin Portal",
@@ -56,10 +54,14 @@ const sidebarData = {
         icon: <FaUserGraduate />,
       },
       {
-        name: "class-subjects",
+        name: "Promotions",
+        href: "/portals/admin/promotions",
+        icon: <FaExchangeAlt />,
+      },
+      {
+        name: "Class Subjects",
         href: "/portals/admin/class-subjects",
-        icon: <FaBook />
-
+        icon: <FaBook />,
       },
       {
         name: "Teachers",
@@ -69,7 +71,6 @@ const sidebarData = {
       { name: "Parents", href: "/portals/admin/parents", icon: <FaUsers /> },
       { name: "Classes", href: "/portals/admin/classes", icon: <FaSchool /> },
       { name: "Subjects", href: "/portals/admin/subjects", icon: <FaBook /> },
-
       {
         name: "Timetable",
         href: "/portals/admin/timetable",
@@ -80,7 +81,6 @@ const sidebarData = {
         href: "/portals/admin/datesheet",
         icon: <FaClipboardList />,
       },
-
       {
         name: "Attendance",
         href: "/portals/admin/attendance",
@@ -88,7 +88,6 @@ const sidebarData = {
       },
       { name: "Results", href: "/portals/admin/results", icon: <FaChartBar /> },
       { name: "Fees", href: "/portals/admin/fees", icon: <FaMoneyBillWave /> },
-
       {
         name: "Job Vacancies",
         href: "/portals/admin/job-vacancies",
@@ -126,7 +125,6 @@ const sidebarData = {
     subtitle: "Learning dashboard",
     links: [
       { name: "Dashboard", href: "/portals/student", icon: <FaHome /> },
-
       { name: "Subjects", href: "/portals/student/subjects", icon: <FaBook /> },
       {
         name: "Timetable",
@@ -187,26 +185,6 @@ const sidebarData = {
     subtitle: "Class management",
     links: [
       { name: "Dashboard", href: "/portals/teacher", icon: <FaHome /> },
-      // {
-      //   name: "My Classes",
-      //   href: "/portals/teacher/classes",
-      //   icon: <FaSchool />,
-      // },
-      // {
-      //   name: "Students",
-      //   href: "/portals/teacher/students",
-      //   icon: <FaUserGraduate />,
-      // },
-      // {
-      //   name: "Timetable",
-      //   href: "/portals/teacher/timetable",
-      //   icon: <FaCalendarAlt />,
-      // },
-      // {
-      //   name: "Exam Datesheet",
-      //   href: "/portals/teacher/datesheet",
-      //   icon: <FaClipboardList />,
-      // },
       {
         name: "Attendance",
         href: "/portals/teacher/attendance",
@@ -242,11 +220,11 @@ const sidebarData = {
         href: "/portals/teacher/remarks",
         icon: <FaComments />,
       },
-      // {
-      //   name: "Evaluations",
-      //   href: "/portals/teacher/evaluations",
-      //   icon: <FaClipboardList />,
-      // },
+      {
+        name: "Evaluations",
+        href: "/portals/teacher/evaluations",
+        icon: <FaClipboardList />,
+      },
       { name: "Notices", href: "/portals/teacher/notices", icon: <FaBell /> },
     ],
   },
@@ -261,8 +239,6 @@ const sidebarData = {
         href: "/portals/parent/children",
         icon: <FaUsers />,
       },
-
-
       {
         name: "Attendance",
         href: "/portals/parent/attendance",
@@ -278,8 +254,12 @@ const sidebarData = {
         href: "/portals/parent/assignments",
         icon: <FaTasks />,
       },
-
       { name: "Fees", href: "/portals/parent/fees", icon: <FaMoneyBillWave /> },
+      {
+        name: "Evaluations",
+        href: "/portals/parent/evaluations",
+        icon: <FaClipboardList />,
+      },
       { name: "Notices", href: "/portals/parent/notices", icon: <FaBell /> },
       {
         name: "Contact School",
@@ -291,58 +271,47 @@ const sidebarData = {
 
   coordinator: {
     title: "Coordinator Portal",
-    subtitle: "Academic supervision",
+    subtitle: "Academic Supervision",
     links: [
-      { name: "Dashboard", href: "/portals/coordinator", icon: <FaHome /> },
       {
-        name: "Students",
-        href: "/portals/coordinator/students",
-        icon: <FaUserGraduate />,
+        name: "Dashboard",
+        href: "/portals/coordinator",
+        icon: <FaHome />,
       },
       {
-        name: "Teachers",
-        href: "/portals/coordinator/teachers",
-        icon: <FaChalkboardTeacher />,
-      },
-      {
-        name: "Classes",
+        name: "Class Monitoring",
         href: "/portals/coordinator/classes",
         icon: <FaSchool />,
       },
       {
-        name: "Subjects",
-        href: "/portals/coordinator/subjects",
-        icon: <FaBook />,
-      },
-      {
-        name: "Timetable",
-        href: "/portals/coordinator/timetable",
-        icon: <FaCalendarAlt />,
-      },
-      {
-        name: "Exam Datesheet",
-        href: "/portals/coordinator/datesheet",
-        icon: <FaClipboardList />,
-      },
-      {
-        name: "Attendance",
+        name: "Attendance Monitoring",
         href: "/portals/coordinator/attendance",
         icon: <FaClipboardCheck />,
       },
       {
-        name: "Results",
-        href: "/portals/coordinator/results",
+        name: "Teacher Monitoring",
+        href: "/portals/coordinator/teachers",
+        icon: <FaChalkboardTeacher />,
+      },
+      {
+        name: "Student Performance",
+        href: "/portals/coordinator/performance",
         icon: <FaChartBar />,
+      },
+      {
+        name: "Student Remarks",
+        href: "/portals/coordinator/remarks",
+        icon: <FaComments />,
+      },
+      {
+        name: "Award Recommendations",
+        href: "/portals/coordinator/awards",
+        icon: <FaUsers />,
       },
       {
         name: "Evaluations",
         href: "/portals/coordinator/evaluations",
         icon: <FaClipboardList />,
-      },
-      {
-        name: "Notices",
-        href: "/portals/coordinator/notices",
-        icon: <FaBell />,
       },
     ],
   },
@@ -357,7 +326,6 @@ const sidebarData = {
         href: "/portals/accountant/students",
         icon: <FaUserGraduate />,
       },
-     
       {
         name: "Fee Collection",
         href: "/portals/accountant/fee-collection",
@@ -373,8 +341,6 @@ const sidebarData = {
         href: "/portals/accountant/fee-defaulters",
         icon: <FaUsers />,
       },
-          
-     
       {
         name: "Payment History",
         href: "/portals/accountant/payment-history",
@@ -404,7 +370,7 @@ const sidebarData = {
         href: "/portals/operator/student-cards",
         icon: <FaUserGraduate />,
       },
-        {
+      {
         name: "Exam Datesheet",
         href: "/portals/operator/datesheet",
         icon: <FaClipboardList />,
@@ -414,7 +380,6 @@ const sidebarData = {
         href: "/portals/operator/timetable",
         icon: <FaCalendarAlt />,
       },
-
       {
         name: "Fee Structure",
         href: "/portals/operator/fee-structure",
@@ -458,7 +423,7 @@ export default function Sidebar() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed left-4 top-4 z-[70] flex h-11 w-11 items-center justify-center rounded-xl bg-black text-xl text-white shadow-lg lg:hidden cursor-pointer hover:bg-black/80 transition"
+        className="fixed left-4 top-4 z-[70] flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl bg-black text-xl text-white shadow-lg transition hover:bg-black/80 lg:hidden"
         aria-label="Open sidebar"
       >
         <FaBars />
@@ -468,19 +433,20 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={closeSidebar}
-          className="fixed inset-0 z-[80]  bg-black/60 lg:hidden"
+          className="fixed inset-0 z-[80] bg-black/60 lg:hidden"
           aria-label="Close sidebar overlay"
         />
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-[90] flex h-screen w-80 shrink-0 flex-col bg-black text-white shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:z-30 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"
-          }`}
+        className={`fixed left-0 top-0 z-[90] flex h-screen w-80 shrink-0 flex-col bg-black text-white shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:z-30 lg:translate-x-0 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         <button
           type="button"
           onClick={closeSidebar}
-          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white lg:hidden cursor-pointer"
+          className="absolute right-4 top-4 flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg bg-white/10 text-white lg:hidden"
           aria-label="Close sidebar"
         >
           <FaTimes />
@@ -512,10 +478,11 @@ export default function Sidebar() {
                 key={link.href}
                 href={link.href}
                 onClick={closeSidebar}
-                className={`flex items-center gap-4 rounded-2xl px-5 py-4 text-base font-semibold transition ${active
+                className={`flex items-center gap-4 rounded-2xl px-5 py-4 text-base font-semibold transition ${
+                  active
                     ? "bg-yellow-500 text-black"
                     : "text-gray-300 hover:bg-white/10 hover:text-white"
-                  }`}
+                }`}
               >
                 <span className="text-lg">{link.icon}</span>
                 <span>{link.name}</span>
@@ -528,10 +495,11 @@ export default function Sidebar() {
           <Link
             href={`/portals/${role}/profile`}
             onClick={closeSidebar}
-            className={`flex items-center gap-4 rounded-2xl px-5 py-4 text-base font-semibold transition ${pathname === `/portals/${role}/profile`
+            className={`flex items-center gap-4 rounded-2xl px-5 py-4 text-base font-semibold transition ${
+              pathname === `/portals/${role}/profile`
                 ? "bg-yellow-500 text-black"
                 : "text-gray-300 hover:bg-white/10 hover:text-white"
-              }`}
+            }`}
           >
             <FaUserCircle className="text-lg" />
             <span>My Profile</span>

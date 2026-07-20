@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
 import {
   getMyRemarksApi,
+  getMyStudentRemarksApi,
   createRemarkApi,
   deleteRemarkApi,
 } from "@/services/remarkService";
@@ -11,6 +12,19 @@ export const fetchMyRemarks = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       return await getMyRemarksApi();
+    } catch (error) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to load remarks"
+      );
+    }
+  }
+);
+
+export const fetchMyStudentRemarks = createAsyncThunk(
+  "remarks/fetchMyStudentRemarks",
+  async (_, thunkAPI) => {
+    try {
+      return await getMyStudentRemarksApi();
     } catch (error) {
       return thunkAPI.rejectWithValue(
         error.response?.data?.message || "Failed to load remarks"
@@ -68,6 +82,18 @@ const remarkSlice = createSlice({
         state.remarks = action.payload.remarks || [];
       })
       .addCase(fetchMyRemarks.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchMyStudentRemarks.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMyStudentRemarks.fulfilled, (state, action) => {
+        state.loading = false;
+        state.remarks = action.payload.remarks || [];
+      })
+      .addCase(fetchMyStudentRemarks.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

@@ -33,7 +33,12 @@ export const errorHandler = (err, req, res, next) => {
     return res.status(401).json({ success: false, message: 'Token expired, please login again' });
   }
 
-  res.status(error.statusCode || 500).json({
+  const statusCode =
+    res.statusCode && res.statusCode !== 200
+      ? res.statusCode
+      : error.statusCode || 500;
+
+  res.status(statusCode).json({
     success: false,
     message: error.message || 'Server Error',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })

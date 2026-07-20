@@ -6,6 +6,7 @@ import Subject from "../models/subject.js";
 import Teacher from "../models/teacher.js";
 import ClassSubject from "../models/ClassSubject.js";
 import { calculateGrade } from "../utils/helpers.js";
+import { assertParentOwnsStudent } from "../utils/ownership.js";
 
 const recalculateResult = (marks = []) => {
   let totalMarks = 0;
@@ -206,7 +207,7 @@ export const getMyResults = asyncHandler(async (req, res) => {
   }
 
   const results = await Result.find({
-    student: req.params.studentId
+    student: student._id
   })
     .populate({
       path: "student",
@@ -231,6 +232,13 @@ export const getMyResults = asyncHandler(async (req, res) => {
 });
 
 export const getStudentResults = asyncHandler(async (req, res) => {
+  // Admin/teacher/operator are trusted staff roles for this route (per
+  // result.Routes.js authorize list) and can view any student. A parent
+  // must be shown to actually be linked to the requested student first.
+  if (req.user.role === "parent") {
+    await assertParentOwnsStudent(req.user._id, req.params.studentId);
+  }
+
   const results = await Result.find({
     student: req.params.studentId
   })
@@ -269,6 +277,35 @@ export const updateResult = asyncHandler(async (req, res) => {
   if (!marks || !Array.isArray(marks) || marks.length === 0) {
     res.status(400);
     throw new Error("Marks are required");
+  }
+
+  // Mirrors enterResults' own check — authorize("teacherOrAdmin") only
+  // confirms the caller is A teacher, not that they teach this specific
+  // class/subject, so every submitted subject must be one they're actually
+  // assigned via ClassSubject before their marks overwrite anyone's grade.
+  if (req.user.role === "teacher") {
+    const teacher = await Teacher.findOne({ user: req.user._id });
+
+    if (!teacher) {
+      res.status(404);
+      throw new Error("Teacher profile not found");
+    }
+
+    for (const item of marks) {
+      const assigned = await ClassSubject.findOne({
+        class: result.class,
+        subject: item.subject,
+        teacher: teacher._id,
+        isActive: true,
+      });
+
+      if (!assigned) {
+        res.status(403);
+        throw new Error(
+          "You are not allowed to update marks for this subject and class"
+        );
+      }
+    }
   }
 
   let totalMarks = 0;
@@ -351,6 +388,29 @@ export const deleteResult = asyncHandler(async (req, res) => {
   if (!result) {
     res.status(404);
     throw new Error("Result not found");
+  }
+
+  if (req.user.role === "teacher") {
+    const teacher = await Teacher.findOne({ user: req.user._id });
+
+    if (!teacher) {
+      res.status(404);
+      throw new Error("Teacher profile not found");
+    }
+
+    const subjectIds = result.marks.map((mark) => mark.subject);
+
+    const assigned = await ClassSubject.findOne({
+      class: result.class,
+      subject: { $in: subjectIds },
+      teacher: teacher._id,
+      isActive: true,
+    });
+
+    if (!assigned) {
+      res.status(403);
+      throw new Error("You are not allowed to delete this result");
+    }
   }
 
   await Result.findByIdAndDelete(req.params.id);

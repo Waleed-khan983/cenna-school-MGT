@@ -110,6 +110,15 @@ export const getQuiz = asyncHandler(async (req, res) => {
     createdAt: 1,
   });
 
+  if (req.user.role === "teacher") {
+    const teacher = await Teacher.findOne({ user: req.user._id });
+
+    if (!teacher || String(quiz.teacher) !== String(teacher._id)) {
+      res.status(403);
+      throw new Error("You are not allowed to view this quiz");
+    }
+  }
+
   if (req.user.role === "student") {
     const student = await Student.findOne({ user: req.user._id });
 
@@ -207,9 +216,23 @@ export const deleteQuizQuestion = asyncHandler(async (req, res) => {
     throw new Error("Question not found");
   }
 
+  // QuizQuestion has no teacher field of its own — ownership is traced
+  // through the parent quiz, same as addQuizQuestion/publishQuiz already do.
   const quiz = await Quiz.findById(question.quiz);
 
-  if (quiz?.isPublished) {
+  if (!quiz) {
+    res.status(404);
+    throw new Error("Quiz not found");
+  }
+
+  const teacher = await Teacher.findOne({ user: req.user._id });
+
+  if (!teacher || String(quiz.teacher) !== String(teacher._id)) {
+    res.status(403);
+    throw new Error("You cannot delete questions from this quiz");
+  }
+
+  if (quiz.isPublished) {
     res.status(400);
     throw new Error("Cannot delete questions after quiz is published");
   }
@@ -324,6 +347,17 @@ export const deleteQuiz = asyncHandler(async (req, res) => {
   if (!quiz) {
     res.status(404);
     throw new Error("Quiz not found");
+  }
+
+  // Every other quiz-mutation handler in this file (publishQuiz,
+  // addQuizQuestion, deleteQuizQuestion, publishQuizResults) already checks
+  // this — deleteQuiz was the one omission, and it's the most destructive
+  // of them all (wipes the quiz plus every student's attempt/score).
+  const teacher = await Teacher.findOne({ user: req.user._id });
+
+  if (!teacher || String(quiz.teacher) !== String(teacher._id)) {
+    res.status(403);
+    throw new Error("You cannot delete this quiz");
   }
 
   await QuizAttempt.deleteMany({ quiz: quiz._id });

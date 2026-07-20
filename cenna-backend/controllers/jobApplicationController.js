@@ -1,5 +1,6 @@
 import asyncHandler from "express-async-handler";
 import JobApplication from "../models/jobApplication.js";
+import { resolveSignedDocumentUrl, destroyUploadedAsset } from "../utils/documentAccess.js";
 
 export const submitJobApplication = asyncHandler(async (req, res) => {
     const {
@@ -18,25 +19,44 @@ export const submitJobApplication = asyncHandler(async (req, res) => {
     } = req.body;
 
     if (!position || !fullName) {
+        // The CV, if any, is already sitting in Cloudinary by this point —
+        // clean it up rather than leaving it orphaned for a request that
+        // fails validation.
+        if (req.file?.filename) {
+            await destroyUploadedAsset(req.file.filename, "raw", "authenticated");
+        }
+
         res.status(400);
         throw new Error("Position and full name are required");
     }
 
-    const application = await JobApplication.create({
-        vacancy: vacancy || undefined,
-        position,
-        fullName,
-        fatherName,
-        cnic,
-        phone,
-        email,
-        address,
-        qualification,
-        experience,
-        expectedSalary,
-        coverLetter,
-        cv: req.file ? `/uploads/${req.file.filename}` : "",
-    });
+    let application;
+
+    try {
+        application = await JobApplication.create({
+            vacancy: vacancy || undefined,
+            position,
+            fullName,
+            fatherName,
+            cnic,
+            phone,
+            email,
+            address,
+            qualification,
+            experience,
+            expectedSalary,
+            coverLetter,
+            // Stored as a Cloudinary public_id (type:"authenticated"), same
+            // reasoning as admission documents — see getAllJobApplications.
+            cv: req.file?.filename || "",
+        });
+    } catch (error) {
+        if (req.file?.filename) {
+            await destroyUploadedAsset(req.file.filename, "raw", "authenticated");
+        }
+
+        throw error;
+    }
 
     res.status(201).json({
         success: true,
@@ -50,10 +70,19 @@ export const getAllJobApplications = asyncHandler(async (req, res) => {
         .populate("vacancy", "title department jobType")
         .sort({ createdAt: -1 });
 
+    // Admin-only route — resolve each stored CV public_id into a
+    // freshly-signed URL at view time (10-minute expiry). Legacy
+    // "/uploads/..." paths pass through unchanged.
+    const withResolvedCv = applications.map((application) => {
+        const obj = application.toObject();
+        obj.cv = resolveSignedDocumentUrl(obj.cv, "raw");
+        return obj;
+    });
+
     res.status(200).json({
         success: true,
         count: applications.length,
-        applications,
+        applications: withResolvedCv,
     });
 });
 

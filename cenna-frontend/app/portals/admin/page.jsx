@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
@@ -16,6 +17,8 @@ import {
   FaImages,
   FaBell,
   FaCalendarAlt,
+  FaExchangeAlt,
+  FaArrowRight,
 } from "react-icons/fa";
 
 import {
@@ -183,14 +186,55 @@ export default function AdminDashboardPage() {
 
   return (
     <section className="space-y-8 p-3 sm:p-4 md:p-6">
-      <div>
-        <h1 className="text-2xl font-extrabold text-black sm:text-3xl">
-          Admin Dashboard
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Complete analytics overview of CENNA School Management System.
-        </p>
+      <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+        <div>
+          <h1 className="text-2xl font-extrabold text-black sm:text-3xl">
+            Admin Dashboard
+          </h1>
+
+          <p className="mt-1 text-sm text-gray-500">
+            Complete analytics overview of CENNA School Management System.
+          </p>
+        </div>
+
+        <Link
+          href="/portals/admin/promotions"
+          className="inline-flex items-center justify-center gap-3 rounded-2xl bg-black px-6 py-4 text-sm font-extrabold text-white shadow-sm transition hover:bg-gray-800"
+        >
+          <FaExchangeAlt />
+          Manage Promotions
+          <FaArrowRight />
+        </Link>
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-3xl border border-yellow-200 bg-yellow-50 p-6"
+      >
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+          <div>
+            <h2 className="text-xl font-extrabold text-black">
+              Automatic Student Promotion
+            </h2>
+
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
+              Students register only once. When the admin promotes a student or
+              a full class, the same student account remains active and the
+              student portal automatically shows the updated class, section, and
+              academic year.
+            </p>
+          </div>
+
+          <Link
+            href="/portals/admin/promotions"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500 px-5 py-3 text-sm font-extrabold text-black transition hover:bg-yellow-400"
+          >
+            Open Promotion Panel
+            <FaArrowRight />
+          </Link>
+        </div>
+      </motion.div>
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {cards.map((card, index) => (
@@ -353,8 +397,16 @@ export default function AdminDashboardPage() {
                 <p className="font-bold text-black">
                   {student.user?.name || "Unnamed Student"}
                 </p>
+
                 <p className="mt-1 text-sm text-gray-500">
                   Admission No: {student.admissionNo || "N/A"}
+                </p>
+
+                <p className="mt-1 text-xs font-semibold text-gray-400">
+                  Class:{" "}
+                  {student.class?.displayName ||
+                    student.class?.name ||
+                    "Not assigned"}
                 </p>
               </InfoItem>
             ))
@@ -368,6 +420,7 @@ export default function AdminDashboardPage() {
             recentNotifications.map((item) => (
               <InfoItem key={item._id}>
                 <p className="font-bold text-black">{item.title}</p>
+
                 <p className="mt-1 line-clamp-2 text-sm text-gray-500">
                   {item.message}
                 </p>
@@ -385,9 +438,11 @@ export default function AdminDashboardPage() {
                 <p className="font-bold text-black">
                   {exam.subjectId?.name || "Subject"}
                 </p>
+
                 <p className="mt-1 text-sm text-gray-500">
                   {exam.classId?.displayName || exam.classId?.name || "Class"}
                 </p>
+
                 <p className="mt-1 text-xs font-semibold text-gray-400">
                   {exam.examDate
                     ? new Date(exam.examDate).toLocaleDateString()

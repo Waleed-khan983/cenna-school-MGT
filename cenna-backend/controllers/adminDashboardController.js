@@ -2,7 +2,7 @@ import asyncHandler from "express-async-handler";
 
 
 
-import Student from "../models/student.js";
+import Student from "../models/Student.js";
 import Teacher from "../models/teacher.js";
 import Parent from "../models/parent.js";
 import Class from "../models/class.js";
@@ -11,9 +11,14 @@ import Fee from "../models/fee.js";
 import Attendance from "../models/attendance.js";
 import News from "../models/news.js";
 import Gallery from "../models/gallery.js";
-import Timetable from "../models/Timetable.js";
-import Datesheet from "../models/Datesheet.js";
+import Timetable from "../models/timetable.js";
+import Datesheet from "../models/datesheet.js";
 import Notification from "../models/notification.js";
+
+// No school-timezone setting exists yet in the schema/config — fall back to
+// the school's actual local timezone (Pabbi, Pakistan) so "today" and
+// "this month" resolve against the school's clock, not the server host's.
+const SCHOOL_TIMEZONE = process.env.SCHOOL_TIMEZONE || "Asia/Karachi";
 
 export const getDashboardStats = asyncHandler(async (req, res) => {
   // Basic Counts
@@ -71,8 +76,17 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     },
   });
 
-  // Today's Timetable Classes
-  const todayClasses = await Timetable.countDocuments();
+  // Today's Timetable Classes — count only entries for the current weekday
+  // in the school's timezone. Timetable.day has no "Sunday" value in its
+  // enum, so a Sunday request naturally yields 0 without special-casing.
+  // The schema has no isActive/cancelled flag on timetable entries, so every
+  // matching entry for the day is counted as-is.
+  const todayName = new Intl.DateTimeFormat("en-US", {
+    timeZone: SCHOOL_TIMEZONE,
+    weekday: "long",
+  }).format(new Date());
+
+  const todayClasses = await Timetable.countDocuments({ day: todayName });
 
   // Monthly Admissions Chart
   const monthlyAdmissions = await Student.aggregate([
@@ -93,29 +107,47 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     },
   ]);
 
-  // Monthly Fee Collection Chart
-  const monthlyFees = await Fee.aggregate([
+  // Monthly Fee Collection Chart — grouped by paidDate (when money was
+  // actually collected), not createdAt (when the challan was generated),
+  // and summed on paidAmount, the field that actually holds collected money
+  // (Fee has no separate `amount`/payment-history collection, so no
+  // double-counting risk). Status is intentionally not filtered on: a
+  // "Partial" fee's paidAmount is real money collected too.
+  //
+  // Known limitation: collectFee overwrites paidDate on every call, so a fee
+  // paid in two partial installments in different months has its full
+  // cumulative paidAmount attributed to the month of the *latest* payment.
+  // Fixing that needs a per-payment history subdocument, out of Tier 5A scope.
+  const currentYear = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: SCHOOL_TIMEZONE,
+      year: "numeric",
+    }).format(new Date())
+  );
+
+  const monthlyFeesRaw = await Fee.aggregate([
     {
       $match: {
-        status: "paid",
+        paidAmount: { $gt: 0 },
+        paidDate: { $exists: true, $ne: null },
       },
     },
     {
       $group: {
         _id: {
-          month: { $month: "$createdAt" },
+          year: { $year: { date: "$paidDate", timezone: SCHOOL_TIMEZONE } },
+          month: { $month: { date: "$paidDate", timezone: SCHOOL_TIMEZONE } },
         },
-        amount: {
-          $sum: "$amount",
-        },
-      },
-    },
-    {
-      $sort: {
-        "_id.month": 1,
+        amount: { $sum: "$paidAmount" },
       },
     },
   ]);
+
+  const feeByMonth = new Map(
+    monthlyFeesRaw
+      .filter((item) => item._id.year === currentYear)
+      .map((item) => [item._id.month, item.amount])
+  );
 
   const monthNames = [
     "",
@@ -138,9 +170,9 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     students: item.students,
   }));
 
-  const formattedFees = monthlyFees.map((item) => ({
-    month: monthNames[item._id.month],
-    amount: item.amount,
+  const formattedFees = monthNames.slice(1).map((name, idx) => ({
+    month: name,
+    amount: feeByMonth.get(idx + 1) || 0,
   }));
 
   // Recent Students

@@ -5,6 +5,11 @@ export const getMyRemarksApi = async () => {
   return res.data;
 };
 
+export const getMyStudentRemarksApi = async () => {
+  const res = await api.get("/remarks/me");
+  return res.data;
+};
+
 export const createRemarkApi = async (data) => {
   const res = await api.post("/remarks", data);
   return res.data;

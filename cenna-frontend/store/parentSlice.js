@@ -10,6 +10,7 @@ import {
   getMyChildrenResultsApi,
   getMyChildrenAssignmentsApi,
   getMyChildrenFeesApi,
+  getMyChildrenRemarksApi,
   updateParentProfileImageApi,
 
 
@@ -89,6 +90,19 @@ export const fetchMyChildrenResults = createAsyncThunk(
   }
 );
 
+
+export const fetchMyChildrenRemarks = createAsyncThunk(
+  "parents/fetchMyChildrenRemarks",
+  async (_, thunkAPI) => {
+    try {
+      return await getMyChildrenRemarksApi();
+    } catch (error) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Failed to load remarks"
+      );
+    }
+  }
+);
 
 export const updateParentProfileImage =
   createAsyncThunk(
@@ -218,8 +232,29 @@ const parentSlice = createSlice({
       .addCase(fetchMyChildrenAssignments.fulfilled, (state, action) => {
         state.assignments = action.payload.assignments || [];
       })
+      .addCase(fetchMyChildrenFees.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchMyChildrenFees.fulfilled, (state, action) => {
+        state.loading = false;
         state.fees = action.payload.fees || [];
+      })
+      .addCase(fetchMyChildrenFees.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchMyChildrenRemarks.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMyChildrenRemarks.fulfilled, (state, action) => {
+        state.loading = false;
+        state.remarks = action.payload.remarks || [];
+      })
+      .addCase(fetchMyChildrenRemarks.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
 
   },

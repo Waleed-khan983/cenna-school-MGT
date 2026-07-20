@@ -1,5 +1,5 @@
 import asyncHandler from "express-async-handler";
-import Timetable from "../models/Timetable.js";
+import Timetable from "../models/timetable.js";
 
 export const createTimetable = asyncHandler(async (req, res) => {
     const timetable = await Timetable.create(req.body);

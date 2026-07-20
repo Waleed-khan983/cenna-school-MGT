@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { getNextSequence } from "../utils/sequence.js";
 
 const FeeSchema = new mongoose.Schema(
   {
@@ -55,7 +56,7 @@ const FeeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-FeeSchema.pre("save", function (next) {
+FeeSchema.pre("save", async function (next) {
   this.totalAmount =
     Number(this.monthlyFee || 0) +
     Number(this.admissionFee || 0) +
@@ -64,7 +65,10 @@ FeeSchema.pre("save", function (next) {
     Number(this.discount || 0);
 
   if (!this.challanNo) {
-    this.challanNo = `CHN-${Date.now()}`;
+    // Date.now() alone collides under concurrent challan generation (same
+    // millisecond, two requests). An atomic counter can't collide.
+    const seq = await getNextSequence("feeChallanNo", this.$session());
+    this.challanNo = `CHN-${String(seq).padStart(6, "0")}`;
   }
 
   next();

@@ -28,6 +28,7 @@ const studentDashboardSlice =
     initialState: {
       stats: {},
       loading: false,
+      error: null,
     },
 
     reducers: {},
@@ -39,6 +40,7 @@ const studentDashboardSlice =
           fetchStudentDashboard.pending,
           (state) => {
             state.loading = true;
+            state.error = null;
           }
         )
 
@@ -53,8 +55,9 @@ const studentDashboardSlice =
 
         .addCase(
           fetchStudentDashboard.rejected,
-          (state) => {
+          (state, action) => {
             state.loading = false;
+            state.error = action.payload;
           }
         );
     },

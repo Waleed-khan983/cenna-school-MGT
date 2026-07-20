@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 // ── Send Success Response ────────────────────────────
 export const sendResponse = (res, statusCode, message, data = {}, meta = {}) => {
@@ -23,7 +24,8 @@ export const sendTokenResponse = (user, statusCode, res, message = 'Success') =>
       email: user.email,
       role: user.role,
       phone: user.phone,
-      avatar: user.avatar
+      avatar: user.avatar,
+      mustChangePassword: user.mustChangePassword
     }
   });
 };
@@ -49,7 +51,7 @@ export const getPagination = (query) => {
 // ── Send Email ───────────────────────────────────────
 export const sendEmail = async ({ to, subject, html, text }) => {
   try {
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT,
       auth: { user: process.env.SMTP_EMAIL, pass: process.env.SMTP_PASSWORD }
@@ -106,15 +108,20 @@ export const sendAttendanceAlert = async (parent, student, date, status) => {
   await sendSMS(parent.whatsapp || parent.user?.phone, msg);
 };
 
-// ── Generate Challan Number ───────────────────────────
-export const generateChallanNo = () => {
-  return `CHN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+// ── Generate Temporary Password ──────────────────────
+// Used whenever an admin creates a student/teacher account without
+// supplying a password. Previously every such account got the same
+// hardcoded "cenna@<year>" password school-wide — this generates a unique,
+// unguessable one per account instead (~72 bits of entropy).
+export const generateTempPassword = () => {
+  return crypto.randomBytes(9).toString('base64url');
 };
 
-// ── Generate Receipt Number ───────────────────────────
-export const generateReceiptNo = () => {
-  return `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-};
+// Note: challan/receipt number generation lives in models/fee.js and
+// controllers/feeController.js respectively, both backed by the atomic
+// counter in utils/sequence.js — see Tier 4 report. The two generators that
+// used to live here were dead code (never imported anywhere) and were
+// collision-prone (Date.now()-based) besides.
 
 // ── Format Date ──────────────────────────────────────
 export const formatDate = (date) => new Date(date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' });

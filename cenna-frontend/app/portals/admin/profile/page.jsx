@@ -7,15 +7,38 @@ import { toast } from "react-toastify";
 import {
   fetchMyProfile,
   updateProfile,
-  changePassword
+  changePassword,
 } from "@/store/profileSlice";
 
 import PageLoader from "@/components/ui/PageLoader";
 
-export default function AdminProfilePage() {
+const FILE_URL =
+  process.env.NEXT_PUBLIC_FILE_URL || "http://localhost:5000";
+
+const getImageUrl = (path) => {
+  if (!path) return "";
+
+  if (path.startsWith("http")) return path;
+
+  const clean = path.replace(/\\/g, "/");
+
+  if (clean.startsWith("uploads/")) {
+    return `${FILE_URL}/${clean}`;
+  }
+
+  if (clean.startsWith("/uploads/")) {
+    return `${FILE_URL}${clean}`;
+  }
+
+  return `${FILE_URL}/${clean}`;
+};
+
+export default function CoordinatorProfilePage() {
   const dispatch = useDispatch();
 
-  const { user, loading, error } = useSelector((state) => state.profile || {});
+  const { user, profile, loading, error } = useSelector(
+    (state) => state.profile || {}
+  );
 
   const [profileImage, setProfileImage] = useState(null);
   const [previewImage, setPreviewImage] = useState("");
@@ -43,12 +66,12 @@ export default function AdminProfilePage() {
         phone: user.phone || "",
       });
 
-      setPreviewImage(user.avatar || "");
+      setPreviewImage(getImageUrl(user.avatar));
     }
   }, [user]);
 
   const profileLetter = useMemo(() => {
-    return profileForm.name?.charAt(0)?.toUpperCase() || "A";
+    return profileForm.name?.charAt(0)?.toUpperCase() || "C";
   }, [profileForm.name]);
 
   const handleProfileChange = (e) => {
@@ -145,7 +168,9 @@ export default function AdminProfilePage() {
   return (
     <section className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-black">Admin Profile</h1>
+        <h1 className="text-3xl font-extrabold text-black">
+          Coordinator Profile
+        </h1>
         <p className="mt-1 text-sm text-gray-500">
           Manage your account information, profile picture, and password.
         </p>
@@ -172,7 +197,7 @@ export default function AdminProfilePage() {
           </div>
 
           <h2 className="mt-4 text-2xl font-extrabold text-black">
-            {profileForm.name || "Admin"}
+            {profileForm.name || "Coordinator"}
           </h2>
 
           <p className="mt-1 text-sm text-gray-500">
@@ -190,10 +215,7 @@ export default function AdminProfilePage() {
           </span>
 
           <p className="mt-4 text-xs text-gray-400">
-            Last Login:{" "}
-            {user?.lastLogin
-              ? new Date(user.lastLogin).toLocaleString()
-              : "Never"}
+            Role: {user?.role || "coordinator"}
           </p>
         </div>
 
@@ -255,6 +277,26 @@ export default function AdminProfilePage() {
           </button>
         </form>
 
+        <div className="rounded-3xl border bg-white p-6 shadow-sm lg:col-span-3">
+          <h2 className="mb-5 text-xl font-extrabold text-black">
+            Coordinator Details
+          </h2>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Info label="CNIC" value={profile?.cnic} />
+            <Info label="Gender" value={profile?.gender} />
+            <Info label="Address" value={profile?.address} />
+            <Info
+              label="Joining Date"
+              value={
+                profile?.joiningDate
+                  ? new Date(profile.joiningDate).toLocaleDateString()
+                  : "N/A"
+              }
+            />
+          </div>
+        </div>
+
         <form
           onSubmit={handlePasswordSubmit}
           className="rounded-3xl border bg-white p-6 shadow-sm lg:col-span-3"
@@ -307,6 +349,15 @@ function Input({ label, name, value, onChange, type = "text" }) {
         onChange={onChange}
         className="w-full rounded-xl border px-4 py-3 outline-none focus:border-black"
       />
+    </div>
+  );
+}
+
+function Info({ label, value }) {
+  return (
+    <div className="rounded-2xl border bg-gray-50 p-4">
+      <p className="text-xs font-bold uppercase text-gray-500">{label}</p>
+      <p className="mt-2 font-semibold">{value || "N/A"}</p>
     </div>
   );
 }

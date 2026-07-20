@@ -5,9 +5,11 @@ import Student from "../models/Student.js";
 import Attendance from "../models/attendance.js";
 import Result from "../models/result.js";
 import Assignment from "../models/assignment.js";
-import Fee from "../models/Fee.js";
+import Fee from "../models/fee.js";
 import ParentMessage from "../models/parentMessage.js";
+import Remark from "../models/Remark.js";
 import { getPagination } from "../utils/helpers.js";
+import { extractCloudinaryPublicId, destroyUploadedAsset } from "../utils/documentAccess.js";
 
 const getParentByUser = async (userId) => {
   const parent = await Parent.findOne({ user: userId });
@@ -149,6 +151,11 @@ export const updateParent = asyncHandler(async (req, res) => {
   if (!parent) {
     res.status(404);
     throw new Error("Parent not found");
+  }
+
+  if (req.user.role === "parent" && String(parent.user) !== String(req.user._id)) {
+    res.status(403);
+    throw new Error("You can only update your own profile");
   }
 
   const {
@@ -346,12 +353,6 @@ export const getMyChildrenAssignments = asyncHandler(async (req, res) => {
 
   const classIds = selectedChildren.map((child) => child.class?._id || child.class);
 
-  console.log("Parent children:", selectedChildren.map((c) => ({
-    name: c.user?.name,
-    class: c.class?._id || c.class,
-  })));
-
-
   const assignments = await Assignment.find({
     class: { $in: classIds },
     isPublished: true,
@@ -429,6 +430,41 @@ export const getMyChildrenFees = asyncHandler(async (req, res) => {
 
  
 
+export const getMyChildrenRemarks = asyncHandler(async (req, res) => {
+  const parent = await getParentByUser(req.user._id);
+
+  const filter = {
+    student: { $in: parent.children },
+  };
+
+  if (req.query.studentId) {
+    if (!parent.children.map(String).includes(String(req.query.studentId))) {
+      res.status(403);
+      throw new Error("This student is not linked to your account");
+    }
+
+    filter.student = req.query.studentId;
+  }
+
+  const remarks = await Remark.find(filter)
+    .populate({
+      path: "teacher",
+      populate: { path: "user", select: "name" },
+    })
+    .populate({
+      path: "student",
+      populate: { path: "user", select: "name" },
+    })
+    .populate("class", "displayName name section")
+    .populate("subject", "name code")
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    success: true,
+    remarks,
+  });
+});
+
 export const updateProfileImage =
   asyncHandler(async (req, res) => {
     const parent =
@@ -436,10 +472,28 @@ export const updateProfileImage =
         user: req.user._id,
       });
 
-    parent.profileImage =
-      `/uploads/parents/${req.file.filename}`;
+    if (!parent) {
+      res.status(404);
+      throw new Error("Parent profile not found");
+    }
+
+    // multer-storage-cloudinary already uploaded the new image (see
+    // routes/parent.Routes.js — uploadImage) by the time this handler
+    // runs; .path is the secure_url, same convention gallery/news use.
+    const previousImage = parent.profileImage;
+
+    parent.profileImage = req.file.path;
 
     await parent.save();
+
+    // Only delete the old avatar once the new one is confirmed saved —
+    // never the other way around. Silently skipped for a legacy
+    // "/uploads/..." path, which was never a Cloudinary asset to begin with.
+    const previousPublicId = extractCloudinaryPublicId(previousImage);
+
+    if (previousPublicId) {
+      await destroyUploadedAsset(previousPublicId, "image");
+    }
 
     res.status(200).json({
       success: true,

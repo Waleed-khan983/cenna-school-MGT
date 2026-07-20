@@ -1,19 +1,24 @@
-const remarks = [
-  {
-    type: "Positive",
-    teacher: "Sir Ahmad",
-    remark: "Very active in class and completes homework on time.",
-    date: "2026-06-01",
-  },
-  {
-    type: "Improvement",
-    teacher: "Miss Sana",
-    remark: "Needs more focus during English grammar practice.",
-    date: "2026-06-03",
-  },
-];
+"use client";
+
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+
+import { fetchMyStudentRemarks } from "@/store/remarkSlice";
+import PageLoader from "@/components/ui/PageLoader";
 
 export default function StudentBehaviorPage() {
+  const dispatch = useDispatch();
+
+  const { remarks = [], loading, error } = useSelector(
+    (state) => state.remarks || {}
+  );
+
+  useEffect(() => {
+    dispatch(fetchMyStudentRemarks());
+  }, [dispatch]);
+
+  if (loading) return <PageLoader text="Loading behavior records..." />;
+
   return (
     <section>
       <h1 className="mb-2 text-3xl font-extrabold text-black">
@@ -21,16 +26,43 @@ export default function StudentBehaviorPage() {
       </h1>
       <p className="mb-6 text-gray-500">View teacher feedback and behavior records.</p>
 
-      <div className="space-y-5">
-        {remarks.map((item) => (
-          <div key={item.remark} className="rounded-3xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-black">{item.type}</h2>
-            <p className="mt-2 text-gray-500">Teacher: {item.teacher}</p>
-            <p className="text-gray-500">Date: {item.date}</p>
-            <p className="mt-3 text-gray-700">{item.remark}</p>
+      {error && (
+        <div className="mb-5 rounded-2xl bg-red-50 p-4 font-semibold text-red-600">
+          {error}
+        </div>
+      )}
+
+      {!error && remarks.length > 0 ? (
+        <div className="space-y-5">
+          {remarks.map((item) => (
+            <div key={item._id} className="rounded-3xl bg-white p-6 shadow-sm">
+              <h2
+                className={`text-xl font-bold ${
+                  item.isPositive ? "text-green-600" : "text-yellow-600"
+                }`}
+              >
+                {item.type || "General"}
+              </h2>
+              <p className="mt-2 text-gray-500">
+                Teacher: {item.teacher?.user?.name || "N/A"}
+              </p>
+              <p className="text-gray-500">
+                Date:{" "}
+                {item.createdAt
+                  ? new Date(item.createdAt).toLocaleDateString()
+                  : "N/A"}
+              </p>
+              <p className="mt-3 text-gray-700">{item.remark}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        !error && (
+          <div className="rounded-3xl bg-white p-10 text-center font-semibold text-gray-500 shadow-sm">
+            No behavior records found.
           </div>
-        ))}
-      </div>
+        )
+      )}
     </section>
   );
 }

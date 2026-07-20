@@ -1,5 +1,5 @@
 import asyncHandler from "express-async-handler";
-import RegisterRequest from "../models/RegisterRequest.js";
+import RegisterRequest from "../models/registerRequest.js";
 import User from "../models/User.js";
 
 export const createRegisterRequest = asyncHandler(async (req, res) => {

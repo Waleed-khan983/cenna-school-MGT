@@ -129,10 +129,6 @@ export default function JobApplicationPage() {
   const [cvFile, setCvFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadPublicVacancies();
-  }, []);
-
   const loadPublicVacancies = async () => {
     try {
       setVacancyLoading(true);
@@ -145,6 +141,10 @@ export default function JobApplicationPage() {
       setVacancyLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadPublicVacancies();
+  }, []);
 
   const updateField = (name, value) => {
     setFormData((prev) => ({
@@ -881,7 +881,7 @@ function StepFour({
         <label className="relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-center">
           <input
             type="file"
-            accept=".pdf,.doc,.docx"
+            accept=".pdf"
             onChange={(e) => {
               const file = e.target.files?.[0];
               setCvFile(file || null);
@@ -899,7 +899,7 @@ function StepFour({
           </p>
 
           <p className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-            <FaUpload /> PDF, DOC, DOCX
+            <FaUpload /> PDF only
           </p>
         </label>
       </FormInput>

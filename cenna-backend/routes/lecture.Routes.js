@@ -6,7 +6,7 @@ import {
     deleteLecture,
     getStudentLectures,
 } from "../controllers/lectureController.js";
-import uploadLecture from "../middleware/uploadlecture.js";
+import { uploadLectureAttachment } from "../config/cloudinary.js";
 
 import {
     protect,
@@ -18,7 +18,7 @@ const router = express.Router();
 router.post("/",
     protect,
     authorize("teacher"),
-    uploadLecture.single("attachment"),
+    uploadLectureAttachment.single("attachment"),
     createLecture
 );
 
@@ -34,13 +34,6 @@ router.get(
     protect,
     authorize("student"),
     getStudentLectures
-);
-
-router.post(
-    "/",
-    protect,
-    authorize("teacher"),
-    createLecture
 );
 
 router.delete(

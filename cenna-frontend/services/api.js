@@ -19,4 +19,16 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+export const openPdfInNewTab = async (url) => {
+  const res = await api.get(url, { responseType: "blob" });
+
+  const blobUrl = URL.createObjectURL(
+    new Blob([res.data], { type: "application/pdf" })
+  );
+
+  window.open(blobUrl, "_blank");
+
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+};
+
 export default api;

@@ -56,13 +56,13 @@ export default function ParentContactPage() {
             <ContactInfo
               icon={<FaWhatsapp />}
               label="WhatsApp"
-              value="03XX-XXXXXXX"
+              value="0300-9290845"
             />
 
             <ContactInfo
               icon={<FaEnvelope />}
               label="Email"
-              value="info@cenna.edu.pk"
+              value="institute.cenna@gmail.com"
             />
 
             <ContactInfo

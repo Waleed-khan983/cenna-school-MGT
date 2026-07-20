@@ -1,11 +1,11 @@
 import asyncHandler from "express-async-handler";
 
-import Class from "../models/Class.js";
+import Class from "../models/class.js";
 import Student from "../models/Student.js";
-import Teacher from "../models/Teacher.js";
-import Attendance from "../models/Attendance.js";
-import Result from "../models/Result.js";
-import Subject from "../models/Subject.js";
+import Teacher from "../models/teacher.js";
+import Attendance from "../models/attendance.js";
+import Result from "../models/result.js";
+import Subject from "../models/subject.js";
 import ClassSubject from "../models/ClassSubject.js";
 import Evaluation from "../models/evaluation.js";
 import Remark from "../models/Remark.js";
@@ -23,14 +23,22 @@ export const getClassMonitoring = asyncHandler(async (req, res) => {
     .lean();
 
   // Fetch everything only once
-  const [students, attendance, results, subjects] = await Promise.all([
+  const [
+    students,
+    attendance,
+    results,
+    classSubjects,
+  ] = await Promise.all([
     Student.find({ isActive: true })
       .populate("user", "name")
       .lean(),
+
     Attendance.find().lean(),
+
     Result.find().lean(),
-    Subject.find({ isActive: true })
-      .select("name classes")
+
+    ClassSubject.find({ isActive: true })
+      .populate("subject", "name")
       .lean(),
   ]);
 
@@ -53,11 +61,13 @@ export const getClassMonitoring = asyncHandler(async (req, res) => {
     );
 
     // Subjects of this class
-    const classSubjects = subjects.filter((sub) =>
-      sub.classes.some(
-        (id) => id.toString() === cls._id.toString()
+    const subjects = classSubjects
+      .filter(
+        (cs) =>
+          cs.class?.toString() ===
+          cls._id.toString()
       )
-    );
+      .map((cs) => cs.subject);
 
     const boys = classStudents.filter(
       (s) => s.gender === "Male"
@@ -128,7 +138,7 @@ export const getClassMonitoring = asyncHandler(async (req, res) => {
 
       averagePerformance,
 
-      subjects: classSubjects,
+      subjects,
 
       topStudent,
 
@@ -371,7 +381,7 @@ export const getTeacherMonitoring = asyncHandler(async (req, res) => {
             (a) => a.class?.displayName
           )
         ),
-      ],  
+      ],
 
       subjects: subjectNames,
 
@@ -414,11 +424,11 @@ export const getStudentPerformance = asyncHandler(async (req, res) => {
       exams === 0
         ? 0
         : Math.round(
-            studentResults.reduce(
-              (sum, r) => sum + (r.percentage || 0),
-              0
-            ) / exams
-          );
+          studentResults.reduce(
+            (sum, r) => sum + (r.percentage || 0),
+            0
+          ) / exams
+        );
 
     const passed = studentResults.filter(
       (r) => r.isPassed
@@ -476,11 +486,11 @@ export const getStudentPerformance = asyncHandler(async (req, res) => {
     performance.length === 0
       ? 0
       : Math.round(
-          performance.reduce(
-            (sum, s) => sum + s.averagePercentage,
-            0
-          ) / performance.length
-        );
+        performance.reduce(
+          (sum, s) => sum + s.averagePercentage,
+          0
+        ) / performance.length
+      );
 
   res.status(200).json({
 
@@ -731,16 +741,37 @@ export const getCoordinatorDashboard = asyncHandler(async (req, res) => {
     totalClasses,
     totalStudents,
     totalTeachers,
+    totalSubjects,
     totalAttendance,
     presentAttendance,
-    totalResults,
+    results,
+    remarks,
+    evaluations,
   ] = await Promise.all([
     Class.countDocuments({ isActive: true }),
     Student.countDocuments({ isActive: true }),
     Teacher.countDocuments({ isActive: true }),
+    Subject.countDocuments({ isActive: true }),
     Attendance.countDocuments(),
     Attendance.countDocuments({ status: "present" }),
-    Result.find().select("percentage").lean(),
+    Result.find().populate({
+      path: "student",
+      populate: {
+        path: "user",
+        select: "name avatar",
+      },
+    }),
+    Remark.find()
+      .populate({
+        path: "student",
+        populate: {
+          path: "user",
+          select: "name avatar",
+        },
+      })
+      .sort({ createdAt: -1 })
+      .limit(5),
+    Evaluation.find(),
   ]);
 
   const attendancePercentage =
@@ -749,24 +780,68 @@ export const getCoordinatorDashboard = asyncHandler(async (req, res) => {
       : Math.round((presentAttendance / totalAttendance) * 100);
 
   const averagePerformance =
-    totalResults.length === 0
+    results.length === 0
       ? 0
       : Math.round(
-          totalResults.reduce(
-            (sum, item) => sum + (item.percentage || 0),
+          results.reduce(
+            (sum, r) => sum + (r.percentage || 0),
             0
-          ) / totalResults.length
+          ) / results.length
         );
+
+  const weakStudents = results.filter(
+    (r) => r.percentage < 40
+  ).length;
+
+  let topStudent = null;
+
+  if (results.length) {
+    topStudent = [...results].sort(
+      (a, b) => b.percentage - a.percentage
+    )[0];
+  }
+
+  const ratingMap = {
+    "Strongly Agree": 4,
+    Agree: 3,
+    Good: 2,
+    Disagree: 1,
+  };
+
+  let teacherScore = 0;
+
+  if (evaluations.length) {
+    let total = 0;
+
+    evaluations.forEach((e) => {
+      total += ratingMap[e.punctuality] || 0;
+      total += ratingMap[e.teachingQuality] || 0;
+      total += ratingMap[e.assignmentGiven] || 0;
+      total += ratingMap[e.assignmentChecking] || 0;
+      total += ratingMap[e.communication] || 0;
+      total += ratingMap[e.discipline] || 0;
+    });
+
+    teacherScore = (
+      total /
+      (evaluations.length * 6)
+    ).toFixed(1);
+  }
 
   res.status(200).json({
     success: true,
 
     dashboard: {
-      totalClasses,
       totalStudents,
       totalTeachers,
+      totalClasses,
+      totalSubjects,
       attendancePercentage,
       averagePerformance,
+      weakStudents,
+      teacherScore,
+      topStudent,
+      recentRemarks: remarks,
     },
   });
 });

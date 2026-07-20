@@ -6,6 +6,7 @@ import Teacher from "../models/teacher.js";
 import Parent from "../models/parent.js";
 import ClassSubject from "../models/ClassSubject.js";
 import { sendAttendanceAlert } from "../utils/helpers.js";
+import { assertParentOwnsStudent, assertTeacherAssignedToClass } from "../utils/ownership.js";
 
 /*
 Convert any supplied date into the start of that date.
@@ -332,6 +333,10 @@ export const getClassAttendance = asyncHandler(
   async (req, res) => {
     const { classId } = req.params;
 
+    if (req.user.role === "teacher") {
+      await assertTeacherAssignedToClass(req.user._id, classId);
+    }
+
     const {
       date,
       subjectId,
@@ -513,6 +518,21 @@ export const getMonthlyReport = asyncHandler(
       );
     }
 
+    // teacherOrAdmin lets a teacher call this route, but classId was
+    // entirely optional — omitting it returned a school-wide report across
+    // every class, and even a supplied classId was never checked against
+    // the caller's own assignments. Admin keeps the unrestricted,
+    // classId-optional (school-wide) behavior; a teacher must specify a
+    // class they're actually assigned to.
+    if (req.user.role === "teacher") {
+      if (!classId) {
+        res.status(400);
+        throw new Error("Class is required");
+      }
+
+      await assertTeacherAssignedToClass(req.user._id, classId);
+    }
+
     const { start, end } = getMonthRange(
       month,
       year
@@ -620,6 +640,26 @@ export const getMonthlyReport = asyncHandler(
 // @access  Parent, Admin, Teacher
 export const getStudentAttendance = asyncHandler(
   async (req, res) => {
+    const student = await Student.findById(req.params.studentId);
+
+    if (!student) {
+      res.status(404);
+      throw new Error("Student not found");
+    }
+
+    // Admin is unrestricted. A parent must be shown to actually be linked
+    // to the requested student, and a teacher must actually be assigned to
+    // this student's class — authorize("admin","parent","teacher") only
+    // confirms the caller's role, not that they have any legitimate
+    // connection to this specific student.
+    if (req.user.role === "parent") {
+      await assertParentOwnsStudent(req.user._id, req.params.studentId);
+    }
+
+    if (req.user.role === "teacher") {
+      await assertTeacherAssignedToClass(req.user._id, student.class);
+    }
+
     const {
       month,
       year,

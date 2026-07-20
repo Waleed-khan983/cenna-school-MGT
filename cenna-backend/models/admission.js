@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { getNextSequence } from '../utils/sequence.js';
 
 
 
@@ -38,8 +39,11 @@ const AdmissionSchema = new mongoose.Schema({
 
 AdmissionSchema.pre('save', async function (next) {
   if (!this.refNo) {
-    const count = await mongoose.model('Admission').countDocuments();
-    this.refNo = `CSP-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    // countDocuments()+1 let two concurrent public submissions read the
+    // same count and generate the same refNo, colliding on the unique
+    // index below. An atomic counter can't collide the same way.
+    const seq = await getNextSequence('admissionRefNo', this.$session());
+    this.refNo = `CSP-${new Date().getFullYear()}-${String(seq).padStart(4, '0')}`;
   }
   next();
 });

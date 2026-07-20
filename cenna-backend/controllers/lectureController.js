@@ -34,13 +34,16 @@ export const createLecture = asyncHandler(async (req, res) => {
         throw new Error("You are not assigned to this class and subject");
     }
 
+    // multer-storage-cloudinary already uploaded the file (see
+    // routes/lecture.Routes.js — uploadLectureAttachment) by the time this
+    // handler runs; .path is the secure_url.
     const lecture = await Lecture.create({
         teacher: teacher._id,
         class: classId,
         subject: subjectId,
         title,
         description,
-        attachment: req.file ? `/uploads/lectures/${req.file.filename}` : "",
+        attachment: req.file ? req.file.path : "",
         videoUrl,
         isPublished: true,
     });

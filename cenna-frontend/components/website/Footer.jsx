@@ -19,8 +19,8 @@ export default function Footer() {
 
   const schoolName = settings?.schoolName || "CENNA School & College";
   const schoolAddress = settings?.schoolAddress || "Main Road, Pabbi, Nowshera";
-  const schoolPhone = settings?.schoolPhone || "+92-333-9038030";
-  const schoolEmail = settings?.schoolEmail || "info@cennaschool.edu.pk";
+  const schoolPhone = settings?.schoolPhone || "+92-300-9290845";
+  const schoolEmail = settings?.schoolEmail || "institute.cenna@gmail.com";
   const whatsappNumber = settings?.whatsappNumber || schoolPhone;
   const officeHours = settings?.officeHours || "Mon–Sat: 8:00 AM – 3:00 PM";
   const website = settings?.website || "";

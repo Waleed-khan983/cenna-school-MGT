@@ -61,6 +61,14 @@ email: {
       index: true,
     },
 
+    // Set true whenever an account is created with a system-generated
+    // temporary password, so the frontend can prompt a forced change.
+    // Cleared on the next successful password change.
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+
     lastLogin: {
       type: Date,
     },

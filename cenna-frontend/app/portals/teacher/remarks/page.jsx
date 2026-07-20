@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 
+import api from "@/services/api";
 import { fetchMyTeacherAssignments } from "@/store/teacherAssignmentSlice";
-import { fetchStudents } from "@/store/studentSlice";
 import {
   fetchMyRemarks,
   addRemark,
@@ -30,18 +30,27 @@ const initialForm = {
   remark: "",
 };
 
+const getId = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return value._id || "";
+};
+
+const getClassName = (cls) => {
+  if (!cls) return "Class N/A";
+  return cls.displayName || `${cls.name || ""} - ${cls.section || ""}`;
+};
+
 export default function TeacherRemarksPage() {
   const dispatch = useDispatch();
 
   const [form, setForm] = useState(initialForm);
   const [search, setSearch] = useState("");
+  const [classStudents, setClassStudents] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
 
   const { assignments = [], loading: assignmentsLoading } = useSelector(
     (state) => state.teacherAssignments || {}
-  );
-
-  const { students = [], loading: studentsLoading } = useSelector(
-    (state) => state.students || {}
   );
 
   const { remarks = [], loading, error } = useSelector(
@@ -57,23 +66,40 @@ export default function TeacherRemarksPage() {
     return assignments.find((item) => item._id === form.assignmentId);
   }, [assignments, form.assignmentId]);
 
+  const selectedClassId = useMemo(() => {
+    return getId(selectedAssignment?.class) || getId(selectedAssignment?.classId);
+  }, [selectedAssignment]);
+
   useEffect(() => {
-    if (selectedAssignment?.class?._id) {
-      dispatch(fetchStudents({ class: selectedAssignment.class._id }));
-      setForm((prev) => ({ ...prev, studentId: "" }));
-    }
-  }, [dispatch, selectedAssignment]);
+    const loadClassStudents = async () => {
+      if (!selectedClassId) {
+        setClassStudents([]);
+        return;
+      }
 
-  const classStudents = useMemo(() => {
-    if (!selectedAssignment?.class?._id) return [];
+      try {
+        setStudentsLoading(true);
 
-    return students.filter((student) => {
-      const studentClassId =
-        typeof student.class === "string" ? student.class : student.class?._id;
+        const res = await api.get(`/students/class/${selectedClassId}`);
 
-      return String(studentClassId) === String(selectedAssignment.class._id);
-    });
-  }, [students, selectedAssignment]);
+        setClassStudents(res.data.students || []);
+
+        setForm((prev) => ({
+          ...prev,
+          studentId: "",
+        }));
+      } catch (error) {
+        setClassStudents([]);
+        toast.error(
+          error.response?.data?.message || "Failed to load class students"
+        );
+      } finally {
+        setStudentsLoading(false);
+      }
+    };
+
+    loadClassStudents();
+  }, [selectedClassId]);
 
   const filteredRemarks = useMemo(() => {
     const value = search.toLowerCase().trim();
@@ -109,7 +135,7 @@ export default function TeacherRemarksPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!selectedAssignment) {
+    if (!selectedAssignment || !selectedClassId) {
       toast.error("Please select class and subject");
       return;
     }
@@ -128,8 +154,8 @@ export default function TeacherRemarksPage() {
       await dispatch(
         addRemark({
           studentId: form.studentId,
-          classId: selectedAssignment.class._id,
-          subjectId: selectedAssignment.subject?._id,
+          classId: selectedClassId,
+          subjectId: getId(selectedAssignment.subject),
           type: form.type,
           isPositive: form.isPositive === "true",
           remark: form.remark.trim(),
@@ -137,7 +163,9 @@ export default function TeacherRemarksPage() {
       ).unwrap();
 
       toast.success("Remark added successfully");
+
       setForm(initialForm);
+      setClassStudents([]);
       dispatch(fetchMyRemarks());
     } catch (error) {
       toast.error(error || "Failed to add remark");
@@ -145,9 +173,7 @@ export default function TeacherRemarksPage() {
   };
 
   const handleDelete = async (remark) => {
-    const confirmed = window.confirm("Delete this remark?");
-
-    if (!confirmed) return;
+    if (!window.confirm("Delete this remark?")) return;
 
     try {
       await dispatch(removeRemark(remark._id)).unwrap();
@@ -204,9 +230,8 @@ export default function TeacherRemarksPage() {
 
             {assignments.map((item) => (
               <option key={item._id} value={item._id}>
-                {item.class?.displayName ||
-                  `${item.class?.name || ""} - ${item.class?.section || ""}`}{" "}
-                | {item.subject?.name || "Subject"}
+                {getClassName(item.class || item.classId)} |{" "}
+                {item.subject?.name || "Subject"}
               </option>
             ))}
           </Select>
@@ -218,7 +243,13 @@ export default function TeacherRemarksPage() {
             onChange={handleChange}
           >
             <option value="">
-              {selectedAssignment ? "Select Student" : "Select class first"}
+              {!selectedAssignment
+                ? "Select class first"
+                : studentsLoading
+                  ? "Loading students..."
+                  : classStudents.length === 0
+                    ? "No students found"
+                    : "Select Student"}
             </option>
 
             {classStudents.map((student) => (
@@ -283,12 +314,6 @@ export default function TeacherRemarksPage() {
           Total remarks: {remarks.length}
         </p>
 
-        {studentsLoading && (
-          <p className="mt-3 text-sm font-semibold text-gray-500">
-            Loading students...
-          </p>
-        )}
-
         {filteredRemarks.length > 0 ? (
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredRemarks.map((item) => (
@@ -324,7 +349,7 @@ export default function TeacherRemarksPage() {
                   <button
                     type="button"
                     onClick={() => handleDelete(item)}
-                    className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white hover:bg-red-500"
+                    className="cursor-pointer rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white hover:bg-red-500"
                   >
                     Delete
                   </button>

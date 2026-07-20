@@ -1,9 +1,9 @@
 import asyncHandler from "express-async-handler";
 
 import ClassSubject from "../models/ClassSubject.js";
-import Class from "../models/Class.js";
-import Subject from "../models/Subject.js";
-import Teacher from "../models/Teacher.js";
+import Class from "../models/class.js";
+import Subject from "../models/subject.js";
+import Teacher from "../models/teacher.js";
 import Student from "../models/Student.js";
 
 // ===============================
@@ -256,6 +256,33 @@ export const getClassSubjectsByClass = asyncHandler(async (req, res) => {
 // Get Teacher Subjects
 // ===============================
 export const getTeacherAssignments = asyncHandler(async (req, res) => {
+    const targetTeacher = await Teacher.findById(req.params.teacherId);
+
+    if (!targetTeacher) {
+        res.status(404);
+        throw new Error("Teacher not found");
+    }
+
+    // authorize("admin", "teacher") only confirms the caller has ONE of
+    // these roles — admin keeps full access, but a teacher must be asking
+    // about themselves. The self-service /teacher/my-assignments route
+    // already exists for that; nothing in the frontend currently calls
+    // this route with an arbitrary id, but the endpoint itself must not
+    // trust req.params.teacherId regardless.
+    if (req.user.role === "teacher") {
+        const teacher = await Teacher.findOne({ user: req.user._id });
+
+        if (!teacher) {
+            res.status(404);
+            throw new Error("Teacher profile not found");
+        }
+
+        if (String(teacher._id) !== String(targetTeacher._id)) {
+            res.status(403);
+            throw new Error("You can only view your own assignments");
+        }
+    }
+
     const assignments = await ClassSubject.find({
         teacher: req.params.teacherId,
         isActive: true,

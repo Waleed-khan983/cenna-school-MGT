@@ -3,7 +3,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./authSlice";
 import studentReducer from "./studentSlice";
 import teacherReducer from "./teacherSlice";
- import classReducer from "./classSlice";
+import classReducer from "./classSlice";
 import subjectReducer from "./subjectSlice";
 import attendanceReducer from "./attendanceSlice";
 import resultReducer from "./resultSlice";
@@ -36,22 +36,25 @@ import remarkReducer from "./remarkSlice";
 import liveClassReducer from "./liveClassSlice";
 import parentReducer from "./parentSlice";
 import coordinatorReducer from "./coordinatorSlice";
+import parentDashboardReducer from "./parentDashboardSlice";
+import teacherDashboardReducer from "./teacherDashboardSlice";
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     students: studentReducer,
     teachers: teacherReducer,
-     classes: classReducer,
+    classes: classReducer,
     subjects: subjectReducer,
     attendance: attendanceReducer,
     results: resultReducer,
     fees: feeReducer,
+
     evaluations: evaluationReducer,
+
     news: newsReducer,
     users: userReducer,
     profile: profileReducer,
-
     gallery: galleryReducer,
     notifications: notificationReducer,
     settings: settingReducer,
@@ -72,9 +75,11 @@ export const store = configureStore({
     lectures: lectureReducer,
     assignments: assignmentReducer,
     quizzes: quizReducer,
-    remarks:remarkReducer,
+    remarks: remarkReducer,
     liveClasses: liveClassReducer,
     parents: parentReducer,
     coordinator: coordinatorReducer,
+    parentDashboard: parentDashboardReducer,
+    teacherDashboard: teacherDashboardReducer,
   },
 });

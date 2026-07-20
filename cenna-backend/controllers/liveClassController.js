@@ -156,6 +156,16 @@ export const joinLiveClass = asyncHandler(async (req, res) => {
     throw new Error("Student profile not found");
   }
 
+  // A LiveClass is scheduled for one specific Class document, and each
+  // Class document already represents one exact grade+section (see
+  // models/class.js) — so matching student.class to liveClass.class is
+  // the full enrollment check this data model supports. Must happen before
+  // the meetingLink is ever built into the response below.
+  if (String(student.class) !== String(liveClass.class)) {
+    res.status(403);
+    throw new Error("You are not enrolled in this class");
+  }
+
   const existing = await LiveClassAttendance.findOne({
     liveClass: liveClass._id,
     student: student._id,
@@ -176,6 +186,22 @@ export const joinLiveClass = asyncHandler(async (req, res) => {
 });
 
 export const getLiveClassAttendance = asyncHandler(async (req, res) => {
+  const liveClass = await LiveClass.findById(req.params.id);
+
+  if (!liveClass) {
+    res.status(404);
+    throw new Error("Live class not found");
+  }
+
+  if (req.user.role === "teacher") {
+    const teacher = await Teacher.findOne({ user: req.user._id });
+
+    if (!teacher || String(liveClass.teacher) !== String(teacher._id)) {
+      res.status(403);
+      throw new Error("You cannot view attendance for this live class");
+    }
+  }
+
   const records = await LiveClassAttendance.find({
     liveClass: req.params.id,
   })

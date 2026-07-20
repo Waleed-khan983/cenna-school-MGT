@@ -76,9 +76,9 @@ export default function ContactPage() {
   const schoolName = settings.schoolName || "CENNA School & College Pabbi";
   const schoolAddress =
     settings.schoolAddress || "Main Road, Pabbi, Nowshera, KPK, Pakistan";
-  const schoolPhone = settings.schoolPhone || "+92-333-9038030";
+  const schoolPhone = settings.schoolPhone || "+92-300-9290845";
   const whatsappNumber = settings.whatsappNumber || schoolPhone;
-  const schoolEmail = settings.schoolEmail || "info@cennaschool.edu.pk";
+  const schoolEmail = settings.schoolEmail || "institute.cenna@gmail.com";
   const officeHours = settings.officeHours || "Mon–Sat: 8:00 AM – 3:00 PM";
   const googleMapLink =
     settings.googleMapLink ||
@@ -128,24 +128,7 @@ export default function ContactPage() {
     },
   ];
 
-  const quickLinks = [
-    {
-      href: "/admissions#apply",
-      icon: <FaGraduationCap />,
-      text: "Apply Now",
-      primary: true,
-    },
-    {
-      href: "/admissions#fees",
-      icon: <FaMoneyBillWave />,
-      text: "Fee Structure",
-    },
-    {
-      href: "/admissions#prospectus",
-      icon: <FaFileAlt />,
-      text: "Prospectus",
-    },
-  ];
+   
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -267,26 +250,7 @@ export default function ContactPage() {
                 whileInView="visible"
                 viewport={{ once: true, amount: 0.2 }}
               >
-                <p className="mb-4 text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Quick Links
-                </p>
-
-                <div className="flex flex-wrap gap-3">
-                  {quickLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className={`inline-flex items-center gap-2 rounded px-4 py-2 text-sm font-semibold transition ${
-                        link.primary
-                          ? "bg-black text-white hover:bg-gray-800"
-                          : "border border-black text-black hover:bg-black hover:text-white"
-                      }`}
-                    >
-                      {link.icon}
-                      {link.text}
-                    </Link>
-                  ))}
-                </div>
+                
               </motion.div>
             </motion.div>
 
@@ -414,23 +378,7 @@ export default function ContactPage() {
               </h2>
             </div>
 
-            {settings.googleMapEmbed ? (
-              <motion.div
-                className="h-[420px] overflow-hidden rounded-xl border border-gray-200 bg-gray-100 shadow-sm"
-                whileHover={{ y: -4 }}
-                dangerouslySetInnerHTML={{ __html: settings.googleMapEmbed }}
-              />
-            ) : (
-              <motion.div
-                className="flex h-[420px] items-center justify-center rounded-xl border border-gray-200 bg-gray-100 p-6 text-center shadow-sm"
-                whileHover={{ y: -4 }}
-              >
-                <p className="max-w-xl text-sm leading-7 text-gray-600">
-                  Map embed is not configured. Please add Google Map Embed code
-                  from Admin Settings.
-                </p>
-              </motion.div>
-            )}
+             
 
             <p className="mt-4 text-center text-sm text-gray-500">
               {schoolName}
